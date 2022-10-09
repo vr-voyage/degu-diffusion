@@ -1,0 +1,9 @@
+.env
+*~
+\#*
+*#
+*.bak
+*.orig
+generated/*.png
+__pycache__
+
