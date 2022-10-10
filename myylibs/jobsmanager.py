@@ -53,7 +53,7 @@ class Job:
     def progressed(self) -> bool:
         return self.read_until < len(self.log)
 
-    def execute(self, method) -> list:
+    def execute(self, method, state) -> list:
         self.log.append(StatusReport("Starting", None))
         if self.iterations < 0:
             self.iterations = 0
@@ -62,6 +62,10 @@ class Job:
             for _ in range(0, self.iterations):
                 result = method(*self.args, **self.kwargs)
                 self.log.append(StatusReport("Progress", result))
+                # FIXME Find a better way than leaking internals from upper layers
+                if not state["queue_running"]:
+                    self.log.append(StatusReport("Canceled", ""))
+                    return
         except Exception as e:
             self.log.append(StatusReport("Failed", str(e)))
             print(e)
@@ -84,7 +88,10 @@ class JobQueue:
         print("Job %s progress : %s" % (str(job.external_reference), str(report.result)))
 
     def report_job_failed(self, job:Job, report:StatusReport):
-        print("Job %s failed :C" % (str(job.external_reference)))
+        print("Job %s failed" % (str(job.external_reference)))
+    
+    def report_job_canceled(self, job:Job, report:StatusReport):
+        print("Job %s canceled" % (str(job.external_reference)))
 
     def is_done_report(self, report:StatusReport) -> bool:
         status = report.status
@@ -131,7 +138,7 @@ class JobQueue:
             if len(jobs) > 0:
                 print("Got a job !")
                 current_job:Job = jobs.pop(0)
-                current_job.execute(work_method)
+                current_job.execute(work_method, state)
                 print("Job done")
             else:
                 time.sleep(1)
@@ -145,7 +152,8 @@ class JobQueue:
             "Starting": self.report_job_started,
             "Progress": self.report_job_progress,
             "Finished": self.report_job_done,
-            "Failed": self.report_job_failed
+            "Failed": self.report_job_failed,
+            "Canceled": self.report_job_canceled
         }
         JobQueue.poll_jobs(self.in_progress, self.running_state, worker_factory, worker_method)
 

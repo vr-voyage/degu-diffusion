@@ -12,6 +12,7 @@ import discord # discord.py
 import dotenv # python-dotenv
 
 from myylibs.jobsmanager import JobQueue, Job, StatusReport # (provided in myylibs/)
+from myylibs.helpers import Helpers # (provided in myylibs/)
 
 from PIL import Image # pillow
 # Don't remove, else you might PNG Metadata support
@@ -22,22 +23,6 @@ from sdworker import DeguDiffusionWorker # (provided in sdworker.py)
 # The code is hideous, with ton of global methods all over
 # the place, because I have no idea how to set this up
 # using cleanly setup objects while still using Discord.py decorators
-
-
-
-# The limit after which the bot will automatically create
-# a thread.
-# By default, it's set on 4, so if you request more than 4 images
-# at once, the bot will create a thread, else it will output
-# the images directly on the same channel.
-MAX_IMAGES_BEFORE_THREAD=4
-
-# When set to True, pictures sent as responses won't show
-# the seed or actual prompt.  
-# You can still analyze PNG afterwards though.
-# This gives a more natural feeling to the generation, but
-# provide less information.
-COMPACT_RESPONSES=False
 
 # The 'Intents' (Discord privileges and rights) used by bot
 intents = discord.Intents.default()
@@ -100,44 +85,6 @@ class MyClient(discord.Client):
             to_send = f'Welcome {guild.name} ! You can start using '
             await guild.system_channel.send(to_send)
 
-class Helper:
-    # I hate the ValueError stupidity from int()/float()
-    # This makes it very hard to one-line parsing
-    # Hence 4 methods that allow for quick parsing and
-    # default fallbacks when parsing fail.
-
-    @staticmethod
-    def to_int(value_string:str, fallback:int):
-        value:int = fallback
-        try:
-            value = int(value_string)
-        except ValueError:
-            value = fallback
-        return value
-
-    @staticmethod
-    def to_int_clamped(value_string:str, fallback:int, min_value:int, max_value:int):
-        value:int = Helper.to_int(value_string, fallback)
-        value = min(max_value, value)
-        value = max(min_value, value)
-        return value
-
-    @staticmethod
-    def to_float(value_string:str, fallback:float):
-        value:float = fallback
-        try:
-            value = float(value_string)
-        except:
-            value = fallback
-        return value
-
-    @staticmethod
-    def to_float_clamped(value_string:str, fallback:float, min_value:float, max_value:float):
-        value:float = Helper.to_float(value_string, fallback)
-        value = min(max_value,value)
-        value = max(min_value,value)
-        return value
-
 # Remember, you're limited to 5 fields in a Discord form
 # Well, Discord.py will yell at you if you go over 5 fields.
 class Generate(discord.ui.Modal, title='Generate'):
@@ -151,7 +98,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             default=n_images_data,
             required=True,
             min_length=1,
-            max_length=2
+            max_length=4
         )
 
         self.prompt = discord.ui.TextInput(
@@ -203,9 +150,9 @@ class Generate(discord.ui.Modal, title='Generate'):
 
     async def on_submit(self, interaction: discord.Interaction):
         prompt = self.prompt.value
-        n_images = Helper.to_int_clamped(self.n_images.value, 8, 1, 64)
-        n_inferences = Helper.to_int_clamped(self.inferences.value, 60, 1, 120)
-        guidance_scale = Helper.to_float_clamped(self.guidance_scale.value, 7.5, 0, 30)
+        n_images = Helpers.to_int_clamped(self.n_images.value, 8, 1, MAX_IMAGES_PER_JOB)
+        n_inferences = Helpers.to_int_clamped(self.inferences.value, 60, 1, MAX_INFERENCES_PER_IMAGE)
+        guidance_scale = Helpers.to_float_clamped(self.guidance_scale.value, 7.5, 0, MAX_GUIDANCE_SCALE_PER_IMAGE)
 
         seed_value = None
         if self.seed.value:
@@ -241,6 +188,8 @@ class Generate(discord.ui.Modal, title='Generate'):
                 "n_inferences": n_inferences,
                 "guidance_scale": 7.5,
                 "deterministic": seed_value if seed_value else True,
+                "width": IMAGES_WIDTH,
+                "height": IMAGES_HEIGHT
             }
         )
 
@@ -278,7 +227,7 @@ async def identify_png(interaction: discord.Interaction, message: discord.Messag
 
     for attachment in message.attachments:
         filename = attachment.filename
-        filepath = OUTPUT_DIRECTORY+filename
+        filepath = os.path.join(OUTPUT_DIRECTORY, filename)
 
         if not os.path.exists(filepath):
             await interaction.response.send_message("I don't remember generating this one...", ephemeral = True)
@@ -310,8 +259,6 @@ async def repeat_diffusion(interaction: discord.Interaction, message: discord.Me
         await interaction.response.send_message(f"I only analyse {client.user.name} messages at the moment", ephemeral = True)
         return
     
-    print("[repeat_diffusion] Message by %s - %s" % (message.author.name, message.content))
-
     # That's very fragile, and heavily rely upon Generate() output
     required_fields = {
         "Prompt :": "prompt_data",
@@ -386,6 +333,9 @@ class MyQueue(JobQueue):
         
     def report_job_failed(self, job:Job, report:StatusReport):
         MyClient.followup_on(job.external_reference, "Ow... The whole thing broke... Try again later, maybe !")
+    
+    def report_job_canceled(self, job:Job, report:StatusReport):
+        MyClient.followup_on(job.external_reference, "Job canceled")
 
 def generate_worker():
     return DeguDiffusionWorker(
@@ -408,22 +358,32 @@ async def main_task(client:MyClient):
 if __name__ == "__main__":
     dotenv.load_dotenv()
     required_environment_variables = [
-        "HUGGINGFACES_TOKEN", "DISCORD_TOKEN", "DISCORD_GUILD_ID",
-        "IMAGES_OUTPUT_DIRECTORY"]
+        "HUGGINGFACES_TOKEN",
+        "DISCORD_TOKEN",
+        "DISCORD_GUILD_ID"]
 
     # Check if all vars are present
     missing_vars = []
     for variable_name in required_environment_variables:
         if variable_name not in os.environ:
             missing_vars.append(variable_name)
-    
+
     if missing_vars:
         print("Some environment variables are missing : %s" % (", ".join(missing_vars)))
         exit(1)
-    
-    GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
-    OUTPUT_DIRECTORY = os.environ['IMAGES_OUTPUT_DIRECTORY']
 
+    GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
+    OUTPUT_DIRECTORY = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    # This tries to get the MAX_IMAGES_PER_JOB environment variable
+    # If it exists, it retrieves it and try to parse it. On failure, it fallback to the number 64.
+    # If it doesn't exist, it convert the string '64' to the same number.
+    MAX_IMAGES_PER_JOB = Helpers.to_int(os.environ.get('MAX_IMAGES_PER_JOB', '64'), 64)
+    MAX_INFERENCES_PER_IMAGE = Helpers.to_int(os.environ.get('MAX_INFERENCES_PER_IMAGE', '120'), 120)
+    MAX_GUIDANCE_SCALE_PER_IMAGE = Helpers.to_float(os.environ.get('MAX_GUIDANCE_SCALE_PER_IMAGE', '20'), 20)
+    IMAGES_WIDTH=Helpers.to_int(os.environ.get('IMAGES_WIDTH', '512'), 512)
+    IMAGES_HEIGHT=Helpers.to_int(os.environ.get('IMAGES_HEIGHT', '512'), 512)
+    MAX_IMAGES_BEFORE_THREAD=Helpers.to_int(os.environ.get('MAX_IMAGES_BEFORE_THREAD', '2'), 2)
+    COMPACT_RESPONSES=False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
     try:
         asyncio.run(main_task(client))
     except:

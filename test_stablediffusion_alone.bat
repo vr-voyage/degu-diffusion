@@ -1,0 +1,2 @@
+python sdworker.py
+pause

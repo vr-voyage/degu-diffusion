@@ -41,6 +41,7 @@ class DeguDiffusionWorker():
         pipe = pipe.to("cuda")
         pipe.enable_attention_slicing()
         print(pipe)
+        print("StableDiffusion ready to go")
 
         # Worker specific values
         self.output_folder:str = output_folder
@@ -96,6 +97,7 @@ class DeguDiffusionWorker():
         nsfw_flag = result["nsfw_content_detected"][0]
         report["seed"] = seed
         report["nsfw"] = nsfw_flag
+        report["filename"] = ""
 
         if not nsfw_flag:
             image:Image = result.images[0]
@@ -213,10 +215,18 @@ class DeguDiffusionWorker():
 
 if __name__ == "__main__":
     import dotenv
+    from myylibs.helpers import Helpers
     dotenv.load_dotenv()
+    output_folder = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    image_width = Helpers.to_int(os.environ.get('IMAGES_WIDTH', '512'), 512)
+    image_height = Helpers.to_int(os.environ.get('IMAGES_HEIGHT', '512'), 512)
     diffuser = DeguDiffusionWorker(
         sd_token = os.environ['HUGGINGFACES_TOKEN'],
-        output_folder = os.environ['IMAGES_OUTPUT_DIRECTORY'],
+        output_folder = output_folder,
         mode = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'))
+    print("Standalone Stable Diffusion test")
     for _ in range(0, 8):
-        diffuser.generate_image("Degu enjoys its morning coffee by {random_artists}, {random_tags}")
+        diffuser.generate_image("Degu enjoys its morning coffee by {random_artists}, {random_tags}",
+        width = image_width,
+        height = image_height)
+    print(f"Test finished. Check the output in {output_folder}")
