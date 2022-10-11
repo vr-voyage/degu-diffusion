@@ -107,7 +107,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             placeholder='Prompt',
             default=prompt_data,
             required=False,
-            max_length=120
+            max_length=500
         )
 
         self.seed = discord.ui.TextInput(

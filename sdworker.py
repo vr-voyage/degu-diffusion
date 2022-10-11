@@ -76,6 +76,8 @@ class DeguDiffusionWorker():
         report["actual_prompt"] = prompt if original_prompt != prompt else ""
 
         metadata = PngInfo()
+        metadata.add_text("AI_Metadata_Type", "Voyage")
+        metadata.add_text("AI_Metadata_Voyage_Version", "0")
         metadata.add_text("AI_Generator", "Stable Diffusion 1.4")
         metadata.add_itxt("AI_Prompt", str(prompt), lang="utf8", tkey="AI_Prompt")
         metadata.add_text("AI_StableDiffusion_Guidance_Scale", str(guidance_scale))
@@ -84,6 +86,7 @@ class DeguDiffusionWorker():
         metadata.add_text("AI_Torch_Generator", "cuda")
         metadata.add_text("AI_Custom_Deterministic", str(deterministic))
         metadata.add_text("AI_Torch_Seed", str(seed))
+        metadata.add_text("AI_Diffusers_Version", str(self.pipe._diffusers_version))
 
         with torch.autocast("cuda"):
             result = self.pipe(
@@ -119,7 +122,7 @@ class DeguDiffusionWorker():
             print(f"[load_replacers] {replacers_filepath} is not a file ?? Doing without")
             return replacers
 
-        with open(replacers_filepath, 'r') as f:
+        with open(replacers_filepath, 'r', encoding='utf-8') as f:
             try:
                 json_content = json.load(f)
             except Exception as e:
