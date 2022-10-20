@@ -50,8 +50,8 @@ class MyClient(discord.Client):
     # By doing so, we don't have to wait up to an hour until they are shown to the end-user.
     async def setup_hook(self):
         # This copies the global commands over to your guild.
-        self.tree.copy_global_to(guild=GUILD)
-        await self.tree.sync(guild=GUILD)
+        #self.tree.copy_global_to(guild=GUILD)
+        await self.tree.sync() # guild=GUILD
     
     @staticmethod
     def followup_on(
@@ -134,7 +134,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             style=discord.TextStyle.short,
             required=True,
             min_length=1,
-            max_length=3
+            max_length=6
         )
 
         super().__init__()
@@ -143,7 +143,6 @@ class Generate(discord.ui.Modal, title='Generate'):
         self.add_item(self.seed)
         self.add_item(self.inferences)
         self.add_item(self.guidance_scale)
-        
 
     def thread_needed(self, n_images:int) -> bool:
         return n_images > MAX_IMAGES_BEFORE_THREAD
@@ -160,6 +159,8 @@ class Generate(discord.ui.Modal, title='Generate'):
                 seed_value = int(self.seed.value)
             except ValueError:
                 pass
+        if seed_value == -1 and SEED_MINUS_ONE_IS_RANDOM:
+            seed_value = None
 
         message  = 'Putting your job into the queue\n'
         message += (
@@ -176,7 +177,8 @@ class Generate(discord.ui.Modal, title='Generate'):
         reference = None
         if self.thread_needed(n_images):
             # Thread titles are limited to 100 characters
-            reference = await message.create_thread(name=prompt[:99], reason=f"DeguDiffusion invoked by {interaction.user.name}")
+            thread_name = prompt[:99] if prompt else "No prompt"
+            reference = await message.create_thread(name=thread_name, reason=f"DeguDiffusion invoked by {interaction.user.name}")
         else:
             reference = interaction.followup
 
@@ -209,7 +211,13 @@ client = MyClient(intents=intents)
 @client.tree.command()
 async def degudiffusion(interaction: discord.Interaction):
     """Stable Diffusion with more degus !"""
-    await interaction.response.send_modal(Generate())
+    await interaction.response.send_modal(Generate(
+        n_images_data=str(DEFAULT_IMAGES_PER_JOB),
+        prompt_data=str(DEFAULT_PROMPT),
+        inferences_data=str(DEFAULT_INFERENCES_STEPS),
+        guidance_scale_data=str(DEFAULT_GUIDANCE_SCALE),
+        seed_data=str(DEFAULT_SEED)
+    ))
 
 def _png_metadata(png_filepath:str) -> dict:
     ret = {}
@@ -240,7 +248,7 @@ async def identify_png(interaction: discord.Interaction, message: discord.Messag
                 
                 response_content = "Metadata:\n"
                 for key in metadata:
-                    response_content += ("**%s**: `%s`\n" % (key, metadata[key]))
+                    response_content += ("**%s**: `%s`\n" % (key, metadata[key] if metadata[key] else " "))
                 
                 await interaction.response.send_message(content = response_content, ephemeral=True)
                 return
@@ -330,6 +338,17 @@ class MyQueue(JobQueue):
             kwargs["message"] = message_content
             
         MyClient.followup_on(**kwargs)
+
+        # Delete after sending doesn't work, since the method will return instantly.
+        # This is not waiting for the message to be actually sent.
+        # I'll need to check how to run an action after the operation is
+        # actually done, else you'll stumble into PermissionError telling you
+        # that the file is currently being used.
+
+        # if DELETE_AFTER_SENT:
+        #     filepath = result["filename"]
+        #     if os.path.exists(filepath):
+        #         os.remove(filepath)
         
     def report_job_failed(self, job:Job, report:StatusReport):
         MyClient.followup_on(job.external_reference, "Ow... The whole thing broke... Try again later, maybe !")
@@ -384,6 +403,17 @@ if __name__ == "__main__":
     IMAGES_HEIGHT=Helpers.to_int(os.environ.get('IMAGES_HEIGHT', '512'), 512)
     MAX_IMAGES_BEFORE_THREAD=Helpers.to_int(os.environ.get('MAX_IMAGES_BEFORE_THREAD', '2'), 2)
     COMPACT_RESPONSES=False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
+
+    # Default setup
+    DEFAULT_IMAGES_PER_JOB=Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
+    # This is not a formatted string, don't add a f near the quotes
+    DEFAULT_PROMPT=os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
+    DEFAULT_SEED=os.environ.get('DEFAULT_SEED', '')
+    DEFAULT_INFERENCES_STEPS=Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
+    DEFAULT_GUIDANCE_SCALE=Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
+    SEED_MINUS_ONE_IS_RANDOM=True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+    #DELETE_AFTER_SENT=False if os.environ.get('DELETE_AFTER_SENT', 'False').lower() != 'true' else True
+
     try:
         asyncio.run(main_task(client))
     except:

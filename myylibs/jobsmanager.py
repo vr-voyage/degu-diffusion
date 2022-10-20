@@ -73,9 +73,6 @@ class Job:
         return self.log
 
 
-
-
-
 class JobQueue:
 
     def report_job_started(self, job:Job, report:StatusReport):

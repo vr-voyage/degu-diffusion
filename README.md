@@ -1,9 +1,9 @@
 # About
 
 This is the code of the first version of my Discord bot named "DeguDiffusion",
-which queue generation requests send by Discord users through an in-app form,
-execute them with a standard diffusers StableDiffusion setup on the same machine,
-and send back the results on the same channel, in a specific thread when seems fit.
+which queue generation requests sent by Discord users through an in-app form,
+execute them with a standard StableDiffusion setup on the same machine,
+and send back the results on the same channel, creating a thread when seems fit.
 
 ![Main view](./screenshots/GenerateForm-Result.png)
 
@@ -84,6 +84,9 @@ Requirements are :
 
 * Discord.py  
 `pip install discord.py`
+
+* Background
+`pip install background`
 
 * HuggingFace StableDiffusion  
 See https://huggingface.co/blog/stable_diffusion  
@@ -177,12 +180,13 @@ Once generated, copy the token as `DISCORD_TOKEN` in the `.env` file.
 Note : Guild means Server
 
 When using the Discord application, open the 'User Settings' panel
-(Gear icon at the right of your nickname, at the bottom left of the
-window), then go to "**App Settings** Advanced" and enable "Developer Mode".
+(Gear icon at the right of your nickname, at the bottom left of the window),
+then go to "**App Settings** Advanced" and enable "Developer Mode".
 
 ![Enabling Developer mode](./screenshots/HowTo-CopyID-DevMode.png)
 
-Now, right click on the icon of the server you want to get the "Guild ID" from and select "Copy ID".
+Now, right click on the icon of the server you want to get the
+"Guild ID" from and select "Copy ID".
 
 ![Copy the ID](./screenshots/Howto-CopyID.png)
 
@@ -265,9 +269,39 @@ When not defined, their **Default** value will be used.
 * `COMPACT_RESPONSES`  
   When set to `True` or `true`, the job response will only include the pictures,
   without any further details (like the Seed, Actual Prompt.).  
-  `Default` : False  
+  **Default** : False  
   Example : `COMPACT_RESPONSES=True`  
   > You can still use "Check Degu PNG Metadata" when using compact responses.
+
+* `DEFAULT_IMAGES_PER_JOB`  
+  The default **NUMBER OF IMAGES** used in `/degudiffusion` form.  
+  **Default** : 8
+
+* `DEFAULT_PROMPT`  
+  The default **PROMPT** used in `/degudiffusion` form.  
+  **Default** : `Degu enjoys its morning coffee by {random_artists}, {random_tags}`
+
+* `DEFAULT_SEED`  
+  The default **SEED** used in `/degudiffusion` form.  
+  **Default** to an empty value.  
+  Note that you don't have to type a SEED value, in Degu Diffusion.  
+  When no seed is provided, a random seed is generated for you.
+
+* `DEFAULT_INFERENCES_STEPS`  
+  The default number of **INFERENCES** used in `/degudiffusion` form.
+  **Default** : 60
+
+* `DEFAULT_GUIDANCE_SCALE`  
+  The default **GUIDANCE SCALE** used in `/degudiffusion` form.  
+  **Default** : 7.5  
+
+* `SEED_MINUS_ONE_IS_RANDOM`  
+  Determine if -1 should be interpreted as a random seed or an actual seed value.  
+  **Default** : True  
+  By default, now, `-1` is treated as a random value, since many users
+  are used to type `-1` to get a random seed.  
+  Note that you don't have to type a SEED value, in Degu Diffusion.  
+  When no seed is provided, a random seed is generated for you.
 
 ### Compact mode
 
@@ -288,3 +322,8 @@ Add `STABLEDIFFUSION_MODE=fp16` to your `.env` if you want to run in
 FP16 mode, reducing the amount of VRAM used.  
 While this can reduce the amount of VRAM used by 1.5 ~ 2 times,
 remember that it's still GPU intensive and VRAM heavy.
+
+# Known bugs
+
+* The 'Job done' message is sent just before the last result, due to
+timing issues.

@@ -228,8 +228,30 @@ if __name__ == "__main__":
         output_folder = output_folder,
         mode = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'))
     print("Standalone Stable Diffusion test")
-    for _ in range(0, 8):
-        diffuser.generate_image("Degu enjoys its morning coffee by {random_artists}, {random_tags}",
+
+    DEFAULT_IMAGES_PER_JOB=Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
+    # This is not a formatted string, don't add a f near the quotes
+    DEFAULT_PROMPT=os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
+    DEFAULT_SEED=os.environ.get('DEFAULT_SEED', '')
+    DEFAULT_INFERENCES_STEPS=Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
+    DEFAULT_GUIDANCE_SCALE=Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
+    SEED_MINUS_ONE_IS_RANDOM=True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+
+    seed_value = None
+    if DEFAULT_SEED:
+        try:
+            seed_value = int(DEFAULT_SEED)
+        except ValueError:
+            pass
+    if seed_value == -1 and SEED_MINUS_ONE_IS_RANDOM:
+        seed_value = None
+
+    for _ in range(0, DEFAULT_IMAGES_PER_JOB):
+        diffuser.generate_image(
+        prompt = DEFAULT_PROMPT,
+        n_inferences = DEFAULT_INFERENCES_STEPS,
+        guidance_scale = DEFAULT_GUIDANCE_SCALE,
+        deterministic = seed_value if seed_value else True,
         width = image_width,
         height = image_height)
     print(f"Test finished. Check the output in {output_folder}")
