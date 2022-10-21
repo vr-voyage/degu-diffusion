@@ -157,7 +157,6 @@ To configure the bot, create a .env file with at least the following variables :
 
 ```env
 DISCORD_TOKEN=YourDiscordBotToken
-DISCORD_GUILD_ID=TheIDOfTheGuildYouWantYourBotIn
 HUGGINGFACES_TOKEN=YourHuggingFaceToken
 ```
 
@@ -174,23 +173,6 @@ You can view your application settings on the [Discord Developer Portal](https:/
 ![Reset Discord bot token](./screenshots/Discord-Bot-Token.png)
 
 Once generated, copy the token as `DISCORD_TOKEN` in the `.env` file.
-
-### Discord Guild ID
-
-Note : Guild means Server
-
-When using the Discord application, open the 'User Settings' panel
-(Gear icon at the right of your nickname, at the bottom left of the window),
-then go to "**App Settings** Advanced" and enable "Developer Mode".
-
-![Enabling Developer mode](./screenshots/HowTo-CopyID-DevMode.png)
-
-Now, right click on the icon of the server you want to get the
-"Guild ID" from and select "Copy ID".
-
-![Copy the ID](./screenshots/Howto-CopyID.png)
-
-Then copy it as `DISCORD_GUILD_ID` in the `.env` file.
 
 ### Huggingface Token
 
