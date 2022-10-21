@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import os
-import time
 import traceback
 
 # Libs
@@ -358,9 +357,13 @@ class MyQueue(JobQueue):
 
 def generate_worker():
     return DeguDiffusionWorker(
-        sd_token = os.environ['HUGGINGFACES_TOKEN'],
+        model_name    = STABLE_DIFFUSION_MODEL_NAME,
+        sd_token      = HUGGINGFACES_TOKEN,
         output_folder = OUTPUT_DIRECTORY,
-        mode = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'))
+        mode          = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'),
+        local_only    = STABLEDIFFUSION_LOCAL_ONLY,
+        torch_device  = TORCH_DEVICE,
+        sd_cache_dir  = STABLEDIFFUSION_CACHE_DIR)
 
 def get_worker_method(worker:DeguDiffusionWorker):
     return worker.generate_image
@@ -375,11 +378,12 @@ async def main_task(client:MyClient):
     )
 
 if __name__ == "__main__":
+    import pathlib
+
     dotenv.load_dotenv()
     required_environment_variables = [
-        "HUGGINGFACES_TOKEN",
-        "DISCORD_TOKEN",
-        "DISCORD_GUILD_ID"]
+        "DISCORD_TOKEN"
+    ]
 
     # Check if all vars are present
     missing_vars = []
@@ -391,27 +395,54 @@ if __name__ == "__main__":
         print("Some environment variables are missing : %s" % (", ".join(missing_vars)))
         exit(1)
 
-    GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
-    OUTPUT_DIRECTORY = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    HUGGINGFACES_TOKEN          = os.environ.get('HUGGINGFACES_TOKEN', '')
+    STABLEDIFFUSION_LOCAL_ONLY  = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
+    STABLE_DIFFUSION_MODEL_NAME = os.environ.get('STABLE_DIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
+
+    if (not HUGGINGFACES_TOKEN) and (not STABLEDIFFUSION_LOCAL_ONLY):
+        print(
+            "At least, either :\n"+
+            "* Set the HUGGINGFACES_TOKEN environment variable.\n"+
+            "* Set the STABLEDIFFUSION_LOCAL_ONLY environment variable to true\n"+
+            "You can also set both, in which case STABLEDIFFUSION_LOCAL_ONLY will take precedence when set to true")
+        exit(1)
+
+    #GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
+    OUTPUT_DIRECTORY            = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
+
+    print(f"Images output directory set to : {OUTPUT_DIRECTORY}")
+    if STABLEDIFFUSION_CACHE_DIR:
+        print(f"Caching Stable Diffusion pipeline files to : {STABLEDIFFUSION_CACHE_DIR}")
+
+    for dirpath in [OUTPUT_DIRECTORY, STABLEDIFFUSION_CACHE_DIR]:
+        if not dirpath:
+            continue
+
+        if not os.path.exists(dirpath):
+            pathlib.Path(dirpath).mkdir(parents = True)
+
+    TORCH_DEVICE                = os.environ.get('TORCH_DEVICE', 'cuda')
+
     # This tries to get the MAX_IMAGES_PER_JOB environment variable
     # If it exists, it retrieves it and try to parse it. On failure, it fallback to the number 64.
     # If it doesn't exist, it convert the string '64' to the same number.
-    MAX_IMAGES_PER_JOB = Helpers.to_int(os.environ.get('MAX_IMAGES_PER_JOB', '64'), 64)
-    MAX_INFERENCES_PER_IMAGE = Helpers.to_int(os.environ.get('MAX_INFERENCES_PER_IMAGE', '120'), 120)
-    MAX_GUIDANCE_SCALE_PER_IMAGE = Helpers.to_float(os.environ.get('MAX_GUIDANCE_SCALE_PER_IMAGE', '20'), 20)
-    IMAGES_WIDTH=Helpers.to_int(os.environ.get('IMAGES_WIDTH', '512'), 512)
-    IMAGES_HEIGHT=Helpers.to_int(os.environ.get('IMAGES_HEIGHT', '512'), 512)
-    MAX_IMAGES_BEFORE_THREAD=Helpers.to_int(os.environ.get('MAX_IMAGES_BEFORE_THREAD', '2'), 2)
-    COMPACT_RESPONSES=False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
+    MAX_IMAGES_PER_JOB             = Helpers.env_var_to_int('MAX_IMAGES_PER_JOB', 64)
+    MAX_INFERENCES_PER_IMAGE       = Helpers.env_var_to_int('MAX_INFERENCES_PER_IMAGE', 120)
+    MAX_GUIDANCE_SCALE_PER_IMAGE   = Helpers.env_var_to_float('MAX_GUIDANCE_SCALE_PER_IMAGE', 30)
+    IMAGES_WIDTH                   = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
+    IMAGES_HEIGHT                  = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
+    MAX_IMAGES_BEFORE_THREAD       = Helpers.env_var_to_int('MAX_IMAGES_BEFORE_THREAD', 2)
+    COMPACT_RESPONSES              = False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
 
     # Default setup
-    DEFAULT_IMAGES_PER_JOB=Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
+    DEFAULT_IMAGES_PER_JOB         = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
     # This is not a formatted string, don't add a f near the quotes
-    DEFAULT_PROMPT=os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
-    DEFAULT_SEED=os.environ.get('DEFAULT_SEED', '')
-    DEFAULT_INFERENCES_STEPS=Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
-    DEFAULT_GUIDANCE_SCALE=Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
-    SEED_MINUS_ONE_IS_RANDOM=True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+    DEFAULT_PROMPT                 = os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
+    DEFAULT_SEED                   = os.environ.get('DEFAULT_SEED', '')
+    DEFAULT_INFERENCES_STEPS       = Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
+    DEFAULT_GUIDANCE_SCALE         = Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
+    SEED_MINUS_ONE_IS_RANDOM       = True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
     #DELETE_AFTER_SENT=False if os.environ.get('DELETE_AFTER_SENT', 'False').lower() != 'true' else True
 
     try:

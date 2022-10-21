@@ -257,25 +257,30 @@ When not defined, their **Default** value will be used.
 
 * `DEFAULT_IMAGES_PER_JOB`  
   The default **NUMBER OF IMAGES** used in `/degudiffusion` form.  
-  **Default** : 8
+  **Default** : 8  
+  Example : `DEFAULT_IMAGES_PER_JOB=3`
 
 * `DEFAULT_PROMPT`  
   The default **PROMPT** used in `/degudiffusion` form.  
   **Default** : `Degu enjoys its morning coffee by {random_artists}, {random_tags}`
+  Example : `DEFAULT_PROMPT=A Nendoroid of a Chipmunk by {random_artists}, {lyuma_cheatcodes}`
 
 * `DEFAULT_SEED`  
   The default **SEED** used in `/degudiffusion` form.  
   **Default** to an empty value.  
   Note that you don't have to type a SEED value, in Degu Diffusion.  
-  When no seed is provided, a random seed is generated for you.
+  When no seed is provided, a random seed is generated for you.  
+  Example : `DEFAULT_SEED=-1`
 
 * `DEFAULT_INFERENCES_STEPS`  
-  The default number of **INFERENCES** used in `/degudiffusion` form.
-  **Default** : 60
+  The default number of **INFERENCES** used in `/degudiffusion` form.  
+  **Default** : 60  
+  Example : `DEFAULT_INFERENCES_STEPS=30`
 
 * `DEFAULT_GUIDANCE_SCALE`  
   The default **GUIDANCE SCALE** used in `/degudiffusion` form.  
   **Default** : 7.5  
+  Example : `DEFAULT_GUIDANCE_SCALE=15`
 
 * `SEED_MINUS_ONE_IS_RANDOM`  
   Determine if -1 should be interpreted as a random seed or an actual seed value.  
@@ -283,7 +288,51 @@ When not defined, their **Default** value will be used.
   By default, now, `-1` is treated as a random value, since many users
   are used to type `-1` to get a random seed.  
   Note that you don't have to type a SEED value, in Degu Diffusion.  
-  When no seed is provided, a random seed is generated for you.
+  When no seed is provided, a random seed is generated for you.  
+  Example : `SEED_MINUS_ONE_IS_RANDOM=false`
+
+* `STABLEDIFFUSION_LOCAL_ONLY`  
+  Force `StableDiffusionPipeline` to use predownloaded local files only, and avoid
+  connecting to the internet.  
+  **Default** : False  
+  Example : `STABLEDIFFUSION_LOCAL_ONLY=true`  
+  > When set to true, `HUGGINGFACES_TOKEN` is not required anymore.
+
+* `STABLEDIFFUSION_CACHE_DIR`  
+  Determine where `StableDiffusionPipeline` download its files to.  
+  **Empty by Default**  
+  This is mainly used for Docker setups.  
+  When not set, or set to an empty string, `StableDiffusionPipeline` will
+  determine where to download its files.  
+  Example : `STABLEDIFFUSION_CACHE_DIR=sd_cache`  
+  > The directory will be created if it doesn't exist.
+
+* `STABLE_DIFFUSION_MODEL_NAME`  
+  Determine the HuggingFaces model used by `StableDiffusionPipeline`.  
+  **Default** : `CompVis/stable-diffusion-v1-4`
+  > Do not change this unless you really know what you are doing.
+
+* `TORCH_DEVICE`  
+  Determine the PyTorch device used. Default to "cuda".  
+  **Default** : `cuda`  
+  Any value other that `cuda` is untested.  
+  Example : `TORCH_DEVICE=rocm`
+
+# Determine where StableDiffusionPipeline download its files to.
+# Mainly used for Docker setups.
+# Empty by default, in which case StableDiffusionPipeline determine
+# the location itself.
+#STABLEDIFFUSION_CACHE_DIR=cache
+
+# Determine the HuggingFaces model used by StableDiffusionPipeline.
+# Do not change this unless you really know what you are doing.
+# Defaults to CompVis/stable-diffusion-v1-4
+#STABLE_DIFFUSION_MODEL_NAME=CompVis/stable-diffusion-v1-4
+
+# Determine the PyTorch device used. Default to "cuda".
+# Any value other that "cuda" is untested.
+# Defaults to cuda
+#TORCH_DEVICE=rocm # Not tested at all.
 
 ### Compact mode
 

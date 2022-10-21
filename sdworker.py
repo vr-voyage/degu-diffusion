@@ -18,27 +18,38 @@ SpecialTag = NamedTuple('SpecialTag', words=list[str], join_word=str, min=int, m
 
 class DeguDiffusionWorker():
 
-    def __init__(self, sd_token:str, output_folder:str, mode:str="fp32"):
-        if not (os.path.exists(output_folder) or os.path.isdir(output_folder)):
-            raise ValueError(f"{output_folder} doesn't exist or is not a directory")
+    def __init__(self, sd_token:str, output_folder:str, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda"):
 
-        # Boilerplate SD
-        if not mode or mode == "fp32":
-            pipe = StableDiffusionPipeline.from_pretrained(
-                "CompVis/stable-diffusion-v1-4",
-                use_auth_token=sd_token)
-                # local_files_only=True)
-        elif mode == "fp16":
-            pipe = StableDiffusionPipeline.from_pretrained(
-                "CompVis/stable-diffusion-v1-4",
-                use_auth_token=sd_token,
-                revision="fp16",
-                torch_dtype=torch.float16)
-                # local_files_only=True)
-        else:
-            raise ValueError(f"Unknown mode {mode}")
+        self.model_name = model_name
+        self.torch_device = torch_device
+        if not output_folder:
+            raise ValueError(f"No output directory provided")
 
-        pipe = pipe.to("cuda")
+        if not os.path.isdir(output_folder):
+            raise ValueError(f"The provided images output path doesn't point to a directory :\n{output_folder}")
+
+        pipeline_kwargs = dict()
+
+        if sd_token:
+            pipeline_kwargs["use_auth_token"] = sd_token
+
+        if sd_cache_dir:
+            if not os.path.isdir(sd_cache_dir):
+                raise ValueError(f"The provided StableDiffusion cache path doesn't point to a directory :\n{sd_cache_dir}")
+            pipeline_kwargs["cache_dir"] = sd_cache_dir
+        
+        if local_only:
+            pipeline_kwargs["local_files_only"] = True
+
+        if mode == "fp16":
+            pipeline_kwargs["revision"] = "fp16"
+            pipeline_kwargs["torch_dtype"] = torch.float16
+
+        pipe = StableDiffusionPipeline.from_pretrained(
+            self.model_name,
+            **pipeline_kwargs)
+
+        pipe = pipe.to(self.torch_device)
         pipe.enable_attention_slicing()
         print(pipe)
         print("StableDiffusion ready to go")
@@ -67,8 +78,8 @@ class DeguDiffusionWorker():
             if type(deterministic) is int:
                 seed = deterministic
             else:
-                seed = torch.Generator("cuda").seed()
-            generator = torch.Generator("cuda").manual_seed(seed)
+                seed = torch.Generator(self.torch_device).seed()
+            generator = torch.Generator(self.torch_device).manual_seed(seed)
 
         original_prompt = prompt
         prompt = self.replace_special_tags(prompt, self.replacers)
@@ -76,19 +87,21 @@ class DeguDiffusionWorker():
         report["actual_prompt"] = prompt if original_prompt != prompt else ""
 
         metadata = PngInfo()
-        metadata.add_text("AI_Metadata_Type", "Voyage")
-        metadata.add_text("AI_Metadata_Voyage_Version", "0")
-        metadata.add_text("AI_Generator", "Stable Diffusion 1.4")
         metadata.add_itxt("AI_Prompt", str(prompt), lang="utf8", tkey="AI_Prompt")
+        metadata.add_text("AI_Torch_Seed", str(seed))
         metadata.add_text("AI_StableDiffusion_Guidance_Scale", str(guidance_scale))
         metadata.add_text("AI_StableDiffusion_Inferences", str(n_inferences))
-        metadata.add_text("AI_StableDiffusion_Pipe", str(self.pipe))
-        metadata.add_text("AI_Torch_Generator", "cuda")
-        metadata.add_text("AI_Custom_Deterministic", str(deterministic))
-        metadata.add_text("AI_Torch_Seed", str(seed))
+        metadata.add_text("AI_StableDiffusion_Model_Name", str(self.model_name))
         metadata.add_text("AI_Diffusers_Version", str(self.pipe._diffusers_version))
+        metadata.add_text("AI_Metadata_Type", "Voyage")
+        metadata.add_text("AI_Metadata_Voyage_Version", "0")
+        metadata.add_text("AI_Generator", str(self.model_name))
+        metadata.add_text("AI_Torch_Generator", str(self.torch_device))
+        metadata.add_text("AI_Custom_Deterministic", str(deterministic))
+        
+        metadata.add_text("AI_StableDiffusion_Pipe", str(self.pipe))
 
-        with torch.autocast("cuda"):
+        with torch.autocast(self.torch_device):
             result = self.pipe(
                 prompt,
                 width=width,
@@ -217,25 +230,53 @@ class DeguDiffusionWorker():
 
 
 if __name__ == "__main__":
+    import pathlib
+
     import dotenv
     from myylibs.helpers import Helpers
     dotenv.load_dotenv()
-    output_folder = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
-    image_width = Helpers.to_int(os.environ.get('IMAGES_WIDTH', '512'), 512)
-    image_height = Helpers.to_int(os.environ.get('IMAGES_HEIGHT', '512'), 512)
+    # FIXME Factorize this with degu_diffusion into a specific python file.
+    # Basically, make a configuration object...
+    IMAGES_OUTPUT_DIRECTORY     = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    IMAGES_WIDTH                = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
+    IMAGES_HEIGHT               = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
+    STABLEDIFFUSION_LOCAL_ONLY  = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
+    HUGGINGFACES_TOKEN          = os.environ.get('HUGGINGFACES_TOKEN', '')
+    STABLE_DIFFUSION_MODEL_NAME = os.environ.get('STABLE_DIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
+    TORCH_DEVICE                = os.environ.get('TORCH_DEVICE', 'cuda')
+    STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
+
+    if STABLEDIFFUSION_CACHE_DIR and (not os.path.exists(STABLEDIFFUSION_CACHE_DIR)):
+        pathlib.Path(STABLEDIFFUSION_CACHE_DIR).mkdir(parents = True)
+
+    if (not HUGGINGFACES_TOKEN) and (not STABLEDIFFUSION_LOCAL_ONLY):
+        print(
+            "At least, either :\n"+
+            "* Set the HUGGINGFACES_TOKEN environment variable.\n"+
+            "* Set the STABLEDIFFUSION_LOCAL_ONLY environment variable to true\n"+
+            "You can also set both, in which case STABLEDIFFUSION_LOCAL_ONLY will take precedence when set to true")
+        exit(1)
+
+    if not os.path.exists(IMAGES_OUTPUT_DIRECTORY):
+        pathlib.Path(IMAGES_OUTPUT_DIRECTORY).mkdir(parents = True)
+
     diffuser = DeguDiffusionWorker(
-        sd_token = os.environ['HUGGINGFACES_TOKEN'],
-        output_folder = output_folder,
-        mode = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'))
+        model_name    = STABLE_DIFFUSION_MODEL_NAME,
+        sd_token      = os.environ.get('HUGGINGFACES_TOKEN', ''),
+        output_folder = IMAGES_OUTPUT_DIRECTORY,
+        mode          = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'),
+        sd_cache_dir  = os.environ.get('STABLEDIFFUSION_CACHE_DIR', ''),
+        local_only    = STABLEDIFFUSION_LOCAL_ONLY,
+        torch_device  = TORCH_DEVICE)
     print("Standalone Stable Diffusion test")
 
-    DEFAULT_IMAGES_PER_JOB=Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
+    DEFAULT_IMAGES_PER_JOB    = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
     # This is not a formatted string, don't add a f near the quotes
-    DEFAULT_PROMPT=os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
-    DEFAULT_SEED=os.environ.get('DEFAULT_SEED', '')
-    DEFAULT_INFERENCES_STEPS=Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
-    DEFAULT_GUIDANCE_SCALE=Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
-    SEED_MINUS_ONE_IS_RANDOM=True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+    DEFAULT_PROMPT            = os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
+    DEFAULT_SEED              = os.environ.get('DEFAULT_SEED', '')
+    DEFAULT_INFERENCES_STEPS  = Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
+    DEFAULT_GUIDANCE_SCALE    = Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
+    SEED_MINUS_ONE_IS_RANDOM  = True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
 
     seed_value = None
     if DEFAULT_SEED:
@@ -248,10 +289,10 @@ if __name__ == "__main__":
 
     for _ in range(0, DEFAULT_IMAGES_PER_JOB):
         diffuser.generate_image(
-        prompt = DEFAULT_PROMPT,
-        n_inferences = DEFAULT_INFERENCES_STEPS,
-        guidance_scale = DEFAULT_GUIDANCE_SCALE,
-        deterministic = seed_value if seed_value else True,
-        width = image_width,
-        height = image_height)
-    print(f"Test finished. Check the output in {output_folder}")
+            prompt         = DEFAULT_PROMPT,
+            n_inferences   = DEFAULT_INFERENCES_STEPS,
+            guidance_scale = DEFAULT_GUIDANCE_SCALE,
+            deterministic  = seed_value if seed_value else True,
+            width          = IMAGES_WIDTH,
+            height         = IMAGES_HEIGHT)
+    print(f"Test finished. Check the output in {IMAGES_OUTPUT_DIRECTORY}")
