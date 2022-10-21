@@ -262,7 +262,7 @@ When not defined, their **Default** value will be used.
 
 * `DEFAULT_PROMPT`  
   The default **PROMPT** used in `/degudiffusion` form.  
-  **Default** : `Degu enjoys its morning coffee by {random_artists}, {random_tags}`
+  **Default** : `Degu enjoys its morning coffee by {random_artists}, {random_tags}`  
   Example : `DEFAULT_PROMPT=A Nendoroid of a Chipmunk by {random_artists}, {lyuma_cheatcodes}`
 
 * `DEFAULT_SEED`  
@@ -317,22 +317,6 @@ When not defined, their **Default** value will be used.
   **Default** : `cuda`  
   Any value other that `cuda` is untested.  
   Example : `TORCH_DEVICE=rocm`
-
-# Determine where StableDiffusionPipeline download its files to.
-# Mainly used for Docker setups.
-# Empty by default, in which case StableDiffusionPipeline determine
-# the location itself.
-#STABLEDIFFUSION_CACHE_DIR=cache
-
-# Determine the HuggingFaces model used by StableDiffusionPipeline.
-# Do not change this unless you really know what you are doing.
-# Defaults to CompVis/stable-diffusion-v1-4
-#STABLE_DIFFUSION_MODEL_NAME=CompVis/stable-diffusion-v1-4
-
-# Determine the PyTorch device used. Default to "cuda".
-# Any value other that "cuda" is untested.
-# Defaults to cuda
-#TORCH_DEVICE=rocm # Not tested at all.
 
 ### Compact mode
 
