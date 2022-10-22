@@ -116,7 +116,7 @@
             "max": 3,
             "max_occurences": 1
         },
-        "{simple_tags_combo}": {
+        "{simple_tags_groups}": {
             "words": [
                 "vibrant, natural lighting, colourful",
                 "neon glitch",
@@ -243,6 +243,7 @@
                 "movie",
                 "cyberpunk",
                 "solarpunk",
+                "steampunk",
                 "kawaii",
                 "fine art",
                 "extremely detailed",
@@ -260,7 +261,10 @@
                 "blue sky",
                 "movement",
                 "radiates",
-                "mignon"
+                "mignon",
+                "psychedelic",
+                "digital painting",
+                "isometric"
             ],
             "join_word": ", ",
             "min": 0,
@@ -293,26 +297,6 @@
                 "vuoel",
                 "eiju",
                 "eivuoel"
-            ],
-            "join_word": " ",
-            "min": 1,
-            "max": 1,
-            "max_occurences": 1
-        },
-        "{voyage}": {
-            "words": [
-                "Voyage",
-                "Degu",
-                "Voyage Voyage",
-                "Voyage-sensei",
-                "Voyage \u30f4\u30a9\u30a2\u30e4\u30fc\u30b8\u30e5",
-                "\u30f4\u30a9\u30a2\u30e4\u30fc\u30b8\u30e5",
-                "Miouyouyou",
-                "Bonbon",
-                "\u30a2\u30e9\u30a4\u3055\u3093",
-                "Kirin",
-                "Tora",
-                "Tairiku Ookami"
             ],
             "join_word": " ",
             "min": 1,

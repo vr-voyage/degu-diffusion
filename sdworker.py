@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import json
-import random
+import logging
 import os
+import random
+import shutil
+import sys
 from typing import NamedTuple
 import time
 import traceback
@@ -12,14 +15,23 @@ from PIL.Image import Image
 from PIL.PngImagePlugin import PngInfo
 import torch
 
-REPLACERS_FILEPATH="replacers.json"
+REPLACERS_FILEPATH="config/replacers.json"
+OLD_REPLACER_FILEPATH="replacers.json"
+REPLACER_SAMPLE_FILEPATH="replacers.json.sample"
 
 SpecialTag = NamedTuple('SpecialTag', words=list[str], join_word=str, min=int, max=int, max_occurences=int)
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class DeguDiffusionWorker():
 
     def __init__(self, sd_token:str, output_folder:str, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda"):
 
+        # Test
+        logger = logging.getLogger('DeguDiffusionWorker')
+
+        logger.info('Initializing StableDiffusion')
+        self.logger = logger
         self.model_name = model_name
         self.torch_device = torch_device
         if not output_folder:
@@ -51,15 +63,18 @@ class DeguDiffusionWorker():
 
         pipe = pipe.to(self.torch_device)
         pipe.enable_attention_slicing()
-        print(pipe)
-        print("StableDiffusion ready to go")
+        logger.debug(str(pipe))
+        logger.info("StableDiffusion ready to go")
 
         # Worker specific values
         self.output_folder:str = output_folder
         self.busy = False
         self.pipe = pipe
         self.results = {}
-        self.replacers:dict = self.load_replacers(replacers_filepath = REPLACERS_FILEPATH)
+        self.replacers:dict = self.load_replacers(
+            replacers_filepath     = REPLACERS_FILEPATH,
+            sample_filepath        = REPLACER_SAMPLE_FILEPATH,
+            old_replacers_filepath = OLD_REPLACER_FILEPATH)
 
     def generate_image(
         self,
@@ -123,16 +138,29 @@ class DeguDiffusionWorker():
 
         return report
 
-    def load_replacers(self, replacers_filepath="replacers.json") -> dict:
+    def load_replacers(
+        self,
+        replacers_filepath     = "config/replacers.json",
+        sample_filepath        = "replacers.json.sample",
+        old_replacers_filepath = "replacers.json") -> dict:
         
-        replacers:dict = {}
+        replacers:dict = dict()
 
         if not os.path.exists(replacers_filepath):
-            print(f"[load_replacers] {replacers_filepath} does not exist")
-            return replacers
+            self.logger.debug(f"[load_replacers] {replacers_filepath} does not exist.")
+            
+            if os.path.exists(old_replacers_filepath):
+                self.logger.debug(f"Copying previous {old_replacers_filepath} to {replacers_filepath}")
+                shutil.copy2(old_replacers_filepath, replacers_filepath)
+            else:
+                if not os.path.exists(sample_filepath):
+                    self.logger.error("No sample available... Something is very wrong with your installation...")
+                    return replacers
+                self.logger.debug(f"Copying the sample {sample_filepath}")
+                shutil.copy2(sample_filepath, replacers_filepath)
         
         if not os.path.isfile(replacers_filepath):
-            print(f"[load_replacers] {replacers_filepath} is not a file ?? Doing without")
+            self.logger.error(f"[load_replacers] {replacers_filepath} is not a file ?? Giving up about replacers")
             return replacers
 
         with open(replacers_filepath, 'r', encoding='utf-8') as f:
@@ -140,17 +168,17 @@ class DeguDiffusionWorker():
                 json_content = json.load(f)
             except Exception as e:
                 traceback.print_exception(e)
-                print(f"[load_replacers] An error happened when trying to parse the JSON file")
+                self.logger.error(f"[load_replacers] An error happened when trying to parse the JSON file")
                 return replacers
 
         if not 'replacements' in json_content:
-            print(f"[load_replacers] No 'replacements' section in root of the JSON file {replacers_filepath}")
+            self.logger.error(f"[load_replacers] No 'replacements' section in root of the JSON file {replacers_filepath}")
             return replacers
 
         replacements = json_content['replacements']
         replacements_field_type = type(replacements)
         if not replacements_field_type == dict:
-            print(f"[load_replacers] replacements must be an OBJECT (dict).\nCurrently it is a {replacements_field_type}")
+            self.logger.error(f"[load_replacers] replacements must be an OBJECT (dict).\nCurrently it is a {replacements_field_type}")
             return replacers
 
         required_fields = {
@@ -164,13 +192,13 @@ class DeguDiffusionWorker():
         for item_name in json_content['replacements']:
             item = replacements[item_name]
             if type(item) != dict:
-                print(f"Invalid type for {item}. Skipping")
+                self.logger.warning(f"Invalid type for {item}. Skipping")
                 continue
 
             # Yet another obnoxious Python syntax
             item_keys = item.keys()
             if not (item.keys() >= required_field_keys):
-                print(f"Missing keys in {item}.\nKeys required : {str(required_field_keys)}\nGot : {str(item_keys)}")
+                self.logger.warning(f"Missing keys in {item}.\nKeys required : {str(required_field_keys)}\nGot : {str(item_keys)}")
                 continue
             
             invalid_fields = []
@@ -180,7 +208,7 @@ class DeguDiffusionWorker():
             
             if invalid_fields:
                 for invalid_field in invalid_fields:
-                    print(f"{invalid_fields} MUST be a {required_fields[invalid_field]}. Currently : {type(item[required_field])}")
+                    self.logger.warning(f"{invalid_fields} MUST be a {required_fields[invalid_field]}. Currently : {type(item[required_field])}")
                 continue
             
             replacer = SpecialTag(
@@ -207,7 +235,7 @@ class DeguDiffusionWorker():
         for tag_name in tags:
             tag:SpecialTag = tags[tag_name]
             if tag == None:
-                print("Tag %s has no value ???" % (tag_name))
+                self.logger.debug("Tag %s has no value ???" % (tag_name))
                 continue
 
             if tag_name not in prompt:
@@ -235,6 +263,8 @@ if __name__ == "__main__":
     import dotenv
     from myylibs.helpers import Helpers
     dotenv.load_dotenv()
+
+    logger = logging.getLogger('StableDiffusion standalone test')
     # FIXME Factorize this with degu_diffusion into a specific python file.
     # Basically, make a configuration object...
     IMAGES_OUTPUT_DIRECTORY     = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
@@ -250,7 +280,7 @@ if __name__ == "__main__":
         pathlib.Path(STABLEDIFFUSION_CACHE_DIR).mkdir(parents = True)
 
     if (not HUGGINGFACES_TOKEN) and (not STABLEDIFFUSION_LOCAL_ONLY):
-        print(
+        logger.fatal(
             "At least, either :\n"+
             "* Set the HUGGINGFACES_TOKEN environment variable.\n"+
             "* Set the STABLEDIFFUSION_LOCAL_ONLY environment variable to true\n"+
@@ -268,7 +298,7 @@ if __name__ == "__main__":
         sd_cache_dir  = os.environ.get('STABLEDIFFUSION_CACHE_DIR', ''),
         local_only    = STABLEDIFFUSION_LOCAL_ONLY,
         torch_device  = TORCH_DEVICE)
-    print("Standalone Stable Diffusion test")
+    logger.info("Standalone Stable Diffusion test")
 
     DEFAULT_IMAGES_PER_JOB    = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
     # This is not a formatted string, don't add a f near the quotes
@@ -295,4 +325,4 @@ if __name__ == "__main__":
             deterministic  = seed_value if seed_value else True,
             width          = IMAGES_WIDTH,
             height         = IMAGES_HEIGHT)
-    print(f"Test finished. Check the output in {IMAGES_OUTPUT_DIRECTORY}")
+    logger.info(f"Test finished. Check the output in {IMAGES_OUTPUT_DIRECTORY}")
