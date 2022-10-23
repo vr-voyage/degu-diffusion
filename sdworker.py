@@ -145,7 +145,7 @@ class DeguDiffusionWorker():
             report["filepath"] = filepath
             
             if self.save_to_disk:
-                image.save(filename, pnginfo=metadata)
+                image.save(filepath, pnginfo=metadata)
             else:
                 image_data = io.BytesIO()
                 image.save(image_data, format='PNG', pnginfo=metadata)
