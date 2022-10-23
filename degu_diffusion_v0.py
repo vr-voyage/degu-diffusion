@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import asyncio
-import io
 import logging
 import os
+import re
 import traceback
 
 # Libs
@@ -32,6 +32,8 @@ intents.guild_messages = True
 # The amount of Debug you want from Discord.py itself
 discord.utils.setup_logging(level=logging.INFO)
 
+CONFIG_DENIED_EXPRESSIONS_FILEPATH = "config/denied_expressions.txt"
+
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -44,6 +46,30 @@ class MyClient(discord.Client):
         # maintain its own tree instead.
         self.tree = discord.app_commands.CommandTree(self)
         self.sd_queue = None
+        self.denied_expressions = self.load_denied_words(CONFIG_DENIED_EXPRESSIONS_FILEPATH)
+
+    def load_denied_words(self, config_filepath:str) -> list:
+        expressions = []
+        if not os.path.exists(config_filepath):
+            return expressions
+        
+        try:
+            with open(config_filepath, "r") as config_file:
+                for line in config_file:
+                    raw_regexp = line.rstrip("\n")
+                    expressions.append(re.compile(raw_regexp, re.IGNORECASE))
+        except Exception as e:
+            traceback.print_exception(e)
+            print(f"Could not load regular expressions from {config_filepath}.")
+            expressions.clear()
+        
+        return expressions
+
+    def string_contains_denied_expressions(self, checked_string:str) -> bool:
+        for expression in self.denied_expressions:
+            if expression.search(checked_string) != None:
+                return True
+        return False
 
     # In this basic example, we just synchronize the app commands to one guild.
     # Instead of specifying a guild to every command, we copy over our global commands instead.
@@ -149,6 +175,11 @@ class Generate(discord.ui.Modal, title='Generate'):
 
     async def on_submit(self, interaction: discord.Interaction):
         prompt = self.prompt.value
+
+        if interaction.client.string_contains_denied_expressions(prompt):
+            await interaction.response.send_message(f"Denied ! ({prompt})")
+            return
+
         n_images = Helpers.to_int_clamped(self.n_images.value, 8, 1, MAX_IMAGES_PER_JOB)
         n_inferences = Helpers.to_int_clamped(self.inferences.value, 60, 1, MAX_INFERENCES_PER_IMAGE)
         guidance_scale = Helpers.to_float_clamped(self.guidance_scale.value, 7.5, 0, MAX_GUIDANCE_SCALE_PER_IMAGE)
