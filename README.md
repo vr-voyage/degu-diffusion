@@ -204,7 +204,7 @@ When not defined, their **Default** value will be used.
 * `SAVE_IMAGES_TO_DISK`  
   Define whether generated files are saved on the disk or not.  
   **Default** : `true`  
-  Example : `SAVE_IMAGE_TO_DISK=false`  
+  Example : `SAVE_IMAGES_TO_DISK=false`  
   > This setting is ignored when testing Stable Diffusion alone.
 
 * `STABLEDIFFUSION_MODE`  
