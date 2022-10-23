@@ -196,12 +196,21 @@ When not defined, their **Default** value will be used.
   Define where you want to store the generated pictures.  
   **Default** : `generated`  
   Spaces are allowed. No need to use quotes.  
-  Example : `IMAGES_OUTPUT_DIRECTORY=another folder`
+  The directory will be created if it doesn't exist.  
+  Example : `IMAGES_OUTPUT_DIRECTORY=another folder`  
+  > When running the bot, this setting is ignored when
+  > `SAVE_IMAGES_TO_DISK` is set to `false`.
+
+* `SAVE_IMAGES_TO_DISK`  
+  Define whether generated files are saved on the disk or not.  
+  **Default** : `true`  
+  Example : `SAVE_IMAGE_TO_DISK=false`  
+  > This setting is ignored when testing Stable Diffusion alone.
 
 * `STABLEDIFFUSION_MODE`  
-  Allows you to select between different StableDiffusion
-  modes. Currently only fp16 and fp32 are supported.  
+  Allows you to select between different StableDiffusion modes.  
   **Default** : `fp32`  
+  Currently only fp16 and fp32 are supported.  
   VRAM usage is lower in fp16, so if you're low on VRAM,
   set this to `fp16`.  
   Example : `STABLEDIFFUSION_MODE=fp16`

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import io
 import logging
 import os
 import traceback
@@ -185,12 +186,12 @@ class Generate(discord.ui.Modal, title='Generate'):
             external_reference=reference,
             iterations = n_images,
             kwargs = {
-                "prompt": prompt,
-                "n_inferences": n_inferences,
+                "prompt":         prompt,
+                "n_inferences":   n_inferences,
                 "guidance_scale": 7.5,
-                "deterministic": seed_value if seed_value else True,
-                "width": IMAGES_WIDTH,
-                "height": IMAGES_HEIGHT
+                "deterministic":  seed_value if seed_value else True,
+                "width":          IMAGES_WIDTH,
+                "height":         IMAGES_HEIGHT
             }
         )
 
@@ -328,7 +329,14 @@ class MyQueue(JobQueue):
             MyClient.followup_on(job.external_reference, message = "You're too young for this one ! Skipping !", ephemeral = True)
             return
 
-        kwargs = {"response": job.external_reference, "file": discord.File(result["filename"])}
+
+        kwargs = {
+            "response": job.external_reference
+        }
+        if result["content_as"] == "file":
+            kwargs["file"] = discord.File(result["filename"])
+        else:
+            kwargs["file"] = discord.File(result["image_data"], filename = result["filename"])
 
         if not COMPACT_RESPONSES:
             message_content = f"Seed : {result['seed']}\n"
@@ -337,17 +345,6 @@ class MyQueue(JobQueue):
             kwargs["message"] = message_content
             
         MyClient.followup_on(**kwargs)
-
-        # Delete after sending doesn't work, since the method will return instantly.
-        # This is not waiting for the message to be actually sent.
-        # I'll need to check how to run an action after the operation is
-        # actually done, else you'll stumble into PermissionError telling you
-        # that the file is currently being used.
-
-        # if DELETE_AFTER_SENT:
-        #     filepath = result["filename"]
-        #     if os.path.exists(filepath):
-        #         os.remove(filepath)
         
     def report_job_failed(self, job:Job, report:StatusReport):
         MyClient.followup_on(job.external_reference, "Ow... The whole thing broke... Try again later, maybe !")
@@ -360,6 +357,7 @@ def generate_worker():
         model_name    = STABLE_DIFFUSION_MODEL_NAME,
         sd_token      = HUGGINGFACES_TOKEN,
         output_folder = OUTPUT_DIRECTORY,
+        save_to_disk  = SAVE_IMAGES_TO_DISK,
         mode          = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'),
         local_only    = STABLEDIFFUSION_LOCAL_ONLY,
         torch_device  = TORCH_DEVICE,
@@ -408,10 +406,15 @@ if __name__ == "__main__":
         exit(1)
 
     #GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
-    OUTPUT_DIRECTORY            = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    SAVE_IMAGES_TO_DISK         = True if os.environ.get('SAVE_IMAGES_TO_DISK', 'True').lower() != 'false' else False
+    OUTPUT_DIRECTORY            = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated') if SAVE_IMAGES_TO_DISK else ""
     STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
 
-    print(f"Images output directory set to : {OUTPUT_DIRECTORY}")
+    if SAVE_IMAGES_TO_DISK:
+        print(f"Images output directory set to : {OUTPUT_DIRECTORY}")
+    else:
+        print(f"SAVES_IMAGES_TO_DISK set to false. Images won't be saved on disk.")
+
     if STABLEDIFFUSION_CACHE_DIR:
         print(f"Caching Stable Diffusion pipeline files to : {STABLEDIFFUSION_CACHE_DIR}")
 
@@ -443,7 +446,6 @@ if __name__ == "__main__":
     DEFAULT_INFERENCES_STEPS       = Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
     DEFAULT_GUIDANCE_SCALE         = Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
     SEED_MINUS_ONE_IS_RANDOM       = True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
-    #DELETE_AFTER_SENT=False if os.environ.get('DELETE_AFTER_SENT', 'False').lower() != 'true' else True
 
     try:
         asyncio.run(main_task(client))

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import io
 import logging
 import os
 import random
@@ -25,7 +26,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class DeguDiffusionWorker():
 
-    def __init__(self, sd_token:str, output_folder:str, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda"):
+    def __init__(self, sd_token:str, output_folder:str="", save_to_disk:bool=True, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda"):
 
         # Test
         logger = logging.getLogger('DeguDiffusionWorker')
@@ -34,11 +35,13 @@ class DeguDiffusionWorker():
         self.logger = logger
         self.model_name = model_name
         self.torch_device = torch_device
-        if not output_folder:
-            raise ValueError(f"No output directory provided")
+        self.save_to_disk = save_to_disk
+        if save_to_disk:
+            if not output_folder:
+                raise ValueError(f"No output directory provided")
 
-        if not os.path.isdir(output_folder):
-            raise ValueError(f"The provided images output path doesn't point to a directory :\n{output_folder}")
+            if not os.path.isdir(output_folder):
+                raise ValueError(f"The provided images output path doesn't point to a directory :\n{output_folder}")
 
         pipeline_kwargs = dict()
 
@@ -83,8 +86,8 @@ class DeguDiffusionWorker():
         guidance_scale: float = 7.5,
         deterministic = True,
         filename_prefix:str = "",
-        width = 512,
-        height = 512):
+        width:int = 512,
+        height:int = 512):
         
         report = {}
         generator = None
@@ -129,12 +132,19 @@ class DeguDiffusionWorker():
         report["seed"] = seed
         report["nsfw"] = nsfw_flag
         report["filename"] = ""
+        report["content_as"] = "file" if self.save_to_disk else "data"
 
         if not nsfw_flag:
             image:Image = result.images[0]
             filename = f"{self.output_folder}/{filename_prefix}{int(time.time())}_SEED_{seed}.png"
-            image.save(filename, pnginfo=metadata)
             report["filename"] = filename
+            if self.save_to_disk:
+                image.save(filename, pnginfo=metadata)
+            else:
+                image_data = io.BytesIO()
+                image.save(image_data, format='PNG', pnginfo=metadata)
+                image_data.seek(0)
+                report["image_data"] = image_data
 
         return report
 
