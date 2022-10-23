@@ -4,6 +4,7 @@ import json
 import io
 import logging
 import os
+import pathlib
 import random
 import shutil
 import sys
@@ -70,7 +71,7 @@ class DeguDiffusionWorker():
         logger.info("StableDiffusion ready to go")
 
         # Worker specific values
-        self.output_folder:str = output_folder
+        self.output_folder:pathlib.Path = pathlib.Path(output_folder) if output_folder else None
         self.busy = False
         self.pipe = pipe
         self.results = {}
@@ -85,7 +86,6 @@ class DeguDiffusionWorker():
         n_inferences: int = 50,
         guidance_scale: float = 7.5,
         deterministic = True,
-        filename_prefix:str = "",
         width:int = 512,
         height:int = 512):
         
@@ -131,13 +131,19 @@ class DeguDiffusionWorker():
         nsfw_flag = result["nsfw_content_detected"][0]
         report["seed"] = seed
         report["nsfw"] = nsfw_flag
-        report["filename"] = ""
+        report["filepath"] = ""
         report["content_as"] = "file" if self.save_to_disk else "data"
 
         if not nsfw_flag:
             image:Image = result.images[0]
-            filename = f"{self.output_folder}/{filename_prefix}{int(time.time())}_SEED_{seed}.png"
-            report["filename"] = filename
+
+            filename = f"{int(time.time())}_SEED_{seed}.png"
+            if self.output_folder:
+                filepath = self.output_folder / filename
+            else:
+                filepath = filename
+            report["filepath"] = filepath
+            
             if self.save_to_disk:
                 image.save(filename, pnginfo=metadata)
             else:
@@ -268,7 +274,7 @@ class DeguDiffusionWorker():
 
 
 if __name__ == "__main__":
-    import pathlib
+
 
     import dotenv
     from myylibs.helpers import Helpers

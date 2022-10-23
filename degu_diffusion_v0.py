@@ -321,7 +321,7 @@ class MyQueue(JobQueue):
             MyClient.followup_on(job.external_reference, message = "Something went wrong. Yell at a dev !", ephemeral = True)
             return
         
-        if not result.keys() >= {"filename", "nsfw", "seed"}:
+        if not result.keys() >= {"filepath", "nsfw", "seed"}:
             MyClient.followup_on(job.external_reference, message = "The image generator is not reporting results correctly. Yell at a dev !", ephemeral = True)
             return
 
@@ -334,9 +334,9 @@ class MyQueue(JobQueue):
             "response": job.external_reference
         }
         if result["content_as"] == "file":
-            kwargs["file"] = discord.File(result["filename"])
+            kwargs["file"] = discord.File(result["filepath"])
         else:
-            kwargs["file"] = discord.File(result["image_data"], filename = result["filename"])
+            kwargs["file"] = discord.File(result["image_data"], filename = result["filepath"])
 
         if not COMPACT_RESPONSES:
             message_content = f"Seed : {result['seed']}\n"
