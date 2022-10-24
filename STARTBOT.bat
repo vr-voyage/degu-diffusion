@@ -1,3 +1,5 @@
+echo off
+
 set STABLEDIFFUSION_CACHE_DIR=stablediffusion_cache
 
 python -m venv venv

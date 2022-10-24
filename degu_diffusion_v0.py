@@ -219,7 +219,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             kwargs = {
                 "prompt":         prompt,
                 "n_inferences":   n_inferences,
-                "guidance_scale": 7.5,
+                "guidance_scale": guidance_scale,
                 "deterministic":  seed_value if seed_value else True,
                 "width":          IMAGES_WIDTH,
                 "height":         IMAGES_HEIGHT
