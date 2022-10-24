@@ -7,3 +7,5 @@
 generated/*.png
 __pycache__
 config/
+venv/
+stablediffusion_cache/
