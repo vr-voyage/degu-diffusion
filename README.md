@@ -248,7 +248,7 @@ When not defined, their **Default** value will be used.
   `IMAGES_HEIGHT=768`
 
 * `MAX_IMAGES_BEFORE_THREAD`  
-  The nuber of images after which the bot will automatically create a thread.  
+  The number of images after which the bot will automatically create a thread.  
   **Default** : `2`  
   That means that if you set it to 5 :  
   When requesting up to 5 images per job, the bot will output everything
