@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+from cProfile import run
 import logging
 import os
 import re
@@ -57,6 +58,9 @@ class MyClient(discord.Client):
             with open(config_filepath, "r") as config_file:
                 for line in config_file:
                     raw_regexp = line.rstrip("\n")
+                    # Empty lines lead to matching every single prompt
+                    if not raw_regexp:
+                        continue
                     expressions.append(re.compile(raw_regexp, re.IGNORECASE))
         except Exception as e:
             traceback.print_exception(e)
@@ -115,7 +119,13 @@ class MyClient(discord.Client):
 # Well, Discord.py will yell at you if you go over 5 fields.
 class Generate(discord.ui.Modal, title='Generate'):
 
-    def __init__(self, n_images_data:str="8", prompt_data:str="Degu enjoys its morning coffee by {random_artists}, {random_tags}", inferences_data:str="60", guidance_scale_data:str="7.5", seed_data:str=""):
+    def __init__(
+        self,
+        n_images_data:str="8",
+        prompt_data:str="Degu enjoys its morning coffee by {random_artists}, {random_tags}",
+        inferences_data:str="60",
+        guidance_scale_data:str="7.5",
+        seed_data:str=""):
         
         self.n_images = discord.ui.TextInput(
             label='Number of images',
@@ -124,7 +134,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             default=n_images_data,
             required=True,
             min_length=1,
-            max_length=4
+            max_length=FORM_NUMBER_OF_IMAGES_INPUT_MAX
         )
 
         self.prompt = discord.ui.TextInput(
@@ -133,14 +143,16 @@ class Generate(discord.ui.Modal, title='Generate'):
             placeholder='Prompt',
             default=prompt_data,
             required=False,
-            max_length=500
+            max_length=FORM_PROMPT_INPUT_MAX
         )
 
         self.seed = discord.ui.TextInput(
             label='Seed',
             required=False,
             default=seed_data,
-            style=discord.TextStyle.short
+            style=discord.TextStyle.short,
+            min_length=0,
+            max_length=FORM_SEED_INPUT_MAX
         )
 
         self.inferences = discord.ui.TextInput(
@@ -150,7 +162,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             style=discord.TextStyle.short,
             required=True,
             min_length=1,
-            max_length=3
+            max_length=FORM_INFERENCES_INPUT_MAX
         )
 
         self.guidance_scale = discord.ui.TextInput(
@@ -160,7 +172,7 @@ class Generate(discord.ui.Modal, title='Generate'):
             style=discord.TextStyle.short,
             required=True,
             min_length=1,
-            max_length=6
+            max_length=FORM_GUIDANCE_SCALE_INPUT_MAX
         )
 
         super().__init__()
@@ -242,13 +254,19 @@ client = MyClient(intents=intents)
 @client.tree.command()
 async def degudiffusion(interaction: discord.Interaction):
     """Stable Diffusion with more degus !"""
-    await interaction.response.send_modal(Generate(
-        n_images_data=str(DEFAULT_IMAGES_PER_JOB),
-        prompt_data=str(DEFAULT_PROMPT),
-        inferences_data=str(DEFAULT_INFERENCES_STEPS),
-        guidance_scale_data=str(DEFAULT_GUIDANCE_SCALE),
-        seed_data=str(DEFAULT_SEED)
-    ))
+    try:
+        await interaction.response.send_modal(Generate(
+            n_images_data=str(DEFAULT_IMAGES_PER_JOB),
+            prompt_data=str(DEFAULT_PROMPT),
+            inferences_data=str(DEFAULT_INFERENCES_STEPS),
+            guidance_scale_data=str(DEFAULT_GUIDANCE_SCALE),
+            seed_data=str(DEFAULT_SEED)
+        ))
+    except Exception as e:
+        traceback.print_exception(e)
+        await interaction.response.send_message(
+            "The form is completely broken. Tell the admin to check its form limits !",
+            ephemeral=True)
 
 def _png_metadata(png_filepath:str) -> dict:
     ret = {}
@@ -328,7 +346,14 @@ async def repeat_diffusion(interaction: discord.Interaction, message: discord.Me
     
     params["prompt_data"] = params["prompt_data"].strip("'")
 
-    await interaction.response.send_modal(Generate(**params))
+    try:
+        await interaction.response.send_modal(Generate(**params))
+    except Exception as e:
+        traceback.print_exception(e)
+        await interaction.response.send_message(
+            "The form broke while reproducing the parameters !\n"+
+            "Tell the admin to check its form limits settings",
+            ephemeral = True)
 
 @client.event
 async def on_ready():
@@ -385,7 +410,7 @@ class MyQueue(JobQueue):
 
 def generate_worker():
     return DeguDiffusionWorker(
-        model_name    = STABLE_DIFFUSION_MODEL_NAME,
+        model_name    = STABLEDIFFUSION_MODEL_NAME,
         sd_token      = HUGGINGFACES_TOKEN,
         output_folder = OUTPUT_DIRECTORY,
         save_to_disk  = SAVE_IMAGES_TO_DISK,
@@ -424,9 +449,9 @@ if __name__ == "__main__":
         print("Some environment variables are missing : %s" % (", ".join(missing_vars)))
         exit(1)
 
-    HUGGINGFACES_TOKEN          = os.environ.get('HUGGINGFACES_TOKEN', '')
-    STABLEDIFFUSION_LOCAL_ONLY  = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
-    STABLE_DIFFUSION_MODEL_NAME = os.environ.get('STABLE_DIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
+    HUGGINGFACES_TOKEN              = os.environ.get('HUGGINGFACES_TOKEN', '')
+    STABLEDIFFUSION_LOCAL_ONLY      = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
+    STABLEDIFFUSION_MODEL_NAME      = os.environ.get('STABLEDIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
 
     if (not HUGGINGFACES_TOKEN) and (not STABLEDIFFUSION_LOCAL_ONLY):
         print(
@@ -437,9 +462,9 @@ if __name__ == "__main__":
         exit(1)
 
     #GUILD = discord.Object(os.environ['DISCORD_GUILD_ID'])
-    SAVE_IMAGES_TO_DISK         = True if os.environ.get('SAVE_IMAGES_TO_DISK', 'True').lower() != 'false' else False
-    OUTPUT_DIRECTORY            = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated') if SAVE_IMAGES_TO_DISK else ""
-    STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
+    SAVE_IMAGES_TO_DISK             = True if os.environ.get('SAVE_IMAGES_TO_DISK', 'True').lower() != 'false' else False
+    OUTPUT_DIRECTORY                = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated') if SAVE_IMAGES_TO_DISK else ""
+    STABLEDIFFUSION_CACHE_DIR       = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
 
     if SAVE_IMAGES_TO_DISK:
         print(f"Images output directory set to : {OUTPUT_DIRECTORY}")
@@ -456,27 +481,33 @@ if __name__ == "__main__":
         if not os.path.exists(dirpath):
             pathlib.Path(dirpath).mkdir(parents = True)
 
-    TORCH_DEVICE                = os.environ.get('TORCH_DEVICE', 'cuda')
+    TORCH_DEVICE                    = os.environ.get('TORCH_DEVICE', 'cuda')
 
     # This tries to get the MAX_IMAGES_PER_JOB environment variable
     # If it exists, it retrieves it and try to parse it. On failure, it fallback to the number 64.
     # If it doesn't exist, it convert the string '64' to the same number.
-    MAX_IMAGES_PER_JOB             = Helpers.env_var_to_int('MAX_IMAGES_PER_JOB', 64)
-    MAX_INFERENCES_PER_IMAGE       = Helpers.env_var_to_int('MAX_INFERENCES_PER_IMAGE', 120)
-    MAX_GUIDANCE_SCALE_PER_IMAGE   = Helpers.env_var_to_float('MAX_GUIDANCE_SCALE_PER_IMAGE', 30)
-    IMAGES_WIDTH                   = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
-    IMAGES_HEIGHT                  = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
-    MAX_IMAGES_BEFORE_THREAD       = Helpers.env_var_to_int('MAX_IMAGES_BEFORE_THREAD', 2)
-    COMPACT_RESPONSES              = False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
+    MAX_IMAGES_PER_JOB              = Helpers.env_var_to_int('MAX_IMAGES_PER_JOB', 64)
+    MAX_INFERENCES_PER_IMAGE        = Helpers.env_var_to_int('MAX_INFERENCES_PER_IMAGE', 120)
+    MAX_GUIDANCE_SCALE_PER_IMAGE    = Helpers.env_var_to_float('MAX_GUIDANCE_SCALE_PER_IMAGE', 30)
+    IMAGES_WIDTH                    = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
+    IMAGES_HEIGHT                   = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
+    MAX_IMAGES_BEFORE_THREAD        = Helpers.env_var_to_int('MAX_IMAGES_BEFORE_THREAD', 2)
+    COMPACT_RESPONSES               = False if os.environ.get('COMPACT_RESPONSES', 'False').lower() != "true" else True
 
     # Default setup
-    DEFAULT_IMAGES_PER_JOB         = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
+    DEFAULT_IMAGES_PER_JOB          = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)
     # This is not a formatted string, don't add a f near the quotes
-    DEFAULT_PROMPT                 = os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
-    DEFAULT_SEED                   = os.environ.get('DEFAULT_SEED', '')
-    DEFAULT_INFERENCES_STEPS       = Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
-    DEFAULT_GUIDANCE_SCALE         = Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
-    SEED_MINUS_ONE_IS_RANDOM       = True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+    DEFAULT_PROMPT                  = os.environ.get('DEFAULT_PROMPT', 'Degu enjoys its morning coffee by {random_artists}, {random_tags}')
+    DEFAULT_SEED                    = os.environ.get('DEFAULT_SEED', '')
+    DEFAULT_INFERENCES_STEPS        = Helpers.env_var_to_int('DEFAULT_INFERENCES_STEPS', 60)
+    DEFAULT_GUIDANCE_SCALE          = Helpers.env_var_to_float('DEFAULT_GUIDANCE_SCALE', 7.5)
+    SEED_MINUS_ONE_IS_RANDOM        = True if os.environ.get('SEED_MINUS_ONE_IS_RANDOM', 'True').lower() != "false" else False
+
+    FORM_NUMBER_OF_IMAGES_INPUT_MAX = Helpers.env_var_to_int('FORM_NUMBER_OF_IMAGES_INPUT_MAX', 4)
+    FORM_PROMPT_INPUT_MAX           = Helpers.env_var_to_int('FORM_PROMPT_INPUT_MAX', 500)
+    FORM_INFERENCES_INPUT_MAX       = Helpers.env_var_to_int('FORM_INFERENCES_INPUT_MAX', 3)
+    FORM_GUIDANCE_SCALE_INPUT_MAX   = Helpers.env_var_to_int('FORM_GUIDANCE_SCALE_INPUT_MAX', 6)
+    FORM_SEED_INPUT_MAX             = Helpers.env_var_to_int('FORM_SEED_INPUT_MAX', 38)
 
     try:
         asyncio.run(main_task(client))

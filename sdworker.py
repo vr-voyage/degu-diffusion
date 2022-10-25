@@ -72,7 +72,6 @@ class DeguDiffusionWorker():
 
         # Worker specific values
         self.output_folder:pathlib.Path = pathlib.Path(output_folder) if output_folder else None
-        self.busy = False
         self.pipe = pipe
         self.results = {}
         self.replacers:dict = self.load_replacers(
@@ -288,7 +287,7 @@ if __name__ == "__main__":
     IMAGES_HEIGHT               = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
     STABLEDIFFUSION_LOCAL_ONLY  = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
     HUGGINGFACES_TOKEN          = os.environ.get('HUGGINGFACES_TOKEN', '')
-    STABLE_DIFFUSION_MODEL_NAME = os.environ.get('STABLE_DIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
+    STABLEDIFFUSION_MODEL_NAME  = os.environ.get('STABLEDIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
     TORCH_DEVICE                = os.environ.get('TORCH_DEVICE', 'cuda')
     STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
 
@@ -307,7 +306,7 @@ if __name__ == "__main__":
         pathlib.Path(IMAGES_OUTPUT_DIRECTORY).mkdir(parents = True)
 
     diffuser = DeguDiffusionWorker(
-        model_name    = STABLE_DIFFUSION_MODEL_NAME,
+        model_name    = STABLEDIFFUSION_MODEL_NAME,
         sd_token      = os.environ.get('HUGGINGFACES_TOKEN', ''),
         output_folder = IMAGES_OUTPUT_DIRECTORY,
         mode          = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'),

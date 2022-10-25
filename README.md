@@ -1,11 +1,57 @@
+# TOC <!-- omit in toc -->
+
+- [About](#about)
+- [Provided commands](#provided-commands)
+  - [DeguDiffusion](#degudiffusion)
+  - [Repeat Diffusion](#repeat-diffusion)
+  - [Check Degu PNG Metadata](#check-degu-png-metadata)
+- [Running the bot](#running-the-bot)
+  - [Requirements](#requirements)
+  - [Running](#running)
+    - [On Windows](#on-windows)
+    - [On other platforms](#on-other-platforms)
+      - [Install the dependencies](#install-the-dependencies)
+      - [Run the bot](#run-the-bot)
+  - [Testing SD alone](#testing-sd-alone)
+  - [How do I get the required informations ?](#how-do-i-get-the-required-informations-)
+    - [Huggingface Token](#huggingface-token)
+    - [Discord Bots, how do they work ?](#discord-bots-how-do-they-work-)
+      - [Creating a bot and bot account](#creating-a-bot-and-bot-account)
+        - [Screenshots of the authorizations](#screenshots-of-the-authorizations)
+          - [Oauth2 General](#oauth2-general)
+          - [Bot intentions](#bot-intentions)
+          - [Oauth2 URL Generator](#oauth2-url-generator)
+      - [Discord Bot Token](#discord-bot-token)
+- [Additional configuration](#additional-configuration)
+  - [Special tags](#special-tags)
+  - [Denying prompts](#denying-prompts)
+    - [Examples](#examples)
+    - [Example 1](#example-1)
+    - [Example 2](#example-2)
+    - [Technical notes](#technical-notes)
+  - [Compact mode](#compact-mode)
+- [Special notes](#special-notes)
+- [Known bugs](#known-bugs)
+
 # About
 
 This is the code of the first version of my Discord bot named "DeguDiffusion",
-which queue generation requests sent by Discord users through an in-app form,
-execute them with a standard StableDiffusion setup on the same machine,
-and send back the results on the same channel, creating a thread when seems fit.
+a self-hosted Discord bot providing AI Image Generation to Discord users, using a local installation of StableDiffusion.  
+
+This is only the core of the application. The creation of the Bot Account and the
+Discord application is left to you.  
 
 ![Main view](./screenshots/GenerateForm-Result.png)
+
+The software is meant to run on a machine equipped with an NVIDIA GPU.
+
+Once configured properly, the software will connect to Discord using the Bot
+account credentials provided, and start accepting generation requests from
+users on the servers the bot has been invited to.  
+Then the bot will use a local installation of StableDiffusion to generate the
+image according to the requests, and send them back on the same channel, using
+a pregenerated thread when deemed appropriate (when requesting more than 2 images
+by default).
 
 The bot has a Job Queue system, allowing you to queue generations
 requests and treat them once previous ones finished.
@@ -53,19 +99,9 @@ Sends back the metadata of a generated PNG, if it still exist on the server.
 > This ony read it if the server already has it.
 >
 > Also, this generates ephemeral messages ("Only you can see this message" messages).  
-> When sent inside threads, these messages cannot be seen by the client.  
+> Sometimes these messages cannot be seen by the client, when sent inside
+> threads.  
 > In this case, just try again.
-
-# Special tags
-
-* `{random_artists}`  
-Adds 1 to 5 random artists names
-* `{random_tags}`  
-Adds 0 to 4 random tags
-* `{lyuma_cheatcodes}`  
-Try it !
-
-You can add more by editing [replacers.json](replacers.json)
 
 # Running the bot
 
@@ -76,31 +112,58 @@ Execute `STARTBOT.bat` or `STARTBOT.sh`.
 
 ## Requirements
 
-You need to be familiar with Python and the installation of
-Python libraries.  
-There is not autosetup through conda or anything here.
+* Python 3 (Tested with Python 3.10)
+* A NVIDIA Graphics Card (CUDA)
+* A [Discord bot account](https://discord.com/developers/applications) for a `DISCORD_TOKEN`
+* A [HuggingFaces account](https://huggingface.co/) for a `HUGGINGFACES_TOKEN`
 
-Requirements are :
+## Running
 
-* Discord.py  
-`pip install discord.py`
+> If you're using Docker, check https://hub.docker.com/r/vrvoyage/degudiffusion
 
-* Background
-`pip install background`
+Setup a `.env` file with at least two entries :
 
-* HuggingFace StableDiffusion  
-See https://huggingface.co/blog/stable_diffusion  
-At least : `pip install diffusers==0.4.0 transformers scipy ftfy`
+```env
+# Make sure your bot has sufficient rights and privileges.
+# Write your Discord bot token after the '='. No quotes needed.
+DISCORD_TOKEN=
 
-Of course, feel free to adapt this to any *Diffusion you want, by editing
-[**sdworker.py**](./sdworker.py).
+# Make sure you accepted the license on
+# https://huggingface.co/CompVis/stable-diffusion-v1-4
+# Write your Huggingfaces token after the '='. No quotes needed.
+HUGGINGFACES_TOKEN=
+```
+
+> Check `.env.sample` for more configuration directives.  
+> Read below if you want to know how to get these tokens.
+
+Then
+
+### On Windows
+
+Double-click on **STARTBOT.bat** and wait for "StableDiffusion ready to go".
+
+### On other platforms
+
+#### Install the dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+#### Run the bot
+
+```bash
+./STARTBOT.sh # or python3 degu_diffusion_v0.py
+```
 
 ## Testing SD alone
 
 If you want to test SD itself alone, run `test_stablediffusion_alone.bat` or
 `test_stablediffusion_alone.sh`.
 
-This should output 8 images in the output folder (`generated/` by default).  
+Using default settings, this should output 8 images in the output
+folder (`generated/` by default).  
 The prompt used during the tests is :  
 **Degu enjoys its morning coffee by {random_artists}, {random_tags}**
 
@@ -110,21 +173,35 @@ provide clear explanations about what's going on.
 
 See **Configuration** below for how to setup the `.env` file.
 
-## Bots, how do they work ?
+## How do I get the required informations ?
 
-A bot is just a special headless Discord client operating with a specific "Bot"
-account.
+### Huggingface Token
 
-The `DISCORD_TOKEN` is used by the Bot to actually login to Discord.
+You need to be registered on HuggingFaces.
 
-Bot can run on your machine, and actually this one is actually only tested
-in that kind of environment.
+Then go to "Access Token" from your User Profile and generate or copy your token
+in the `.env` file as `HUGGINGFACES_TOKEN`.
 
-### Creating a bot
+![Get an Access Token](./screenshots/Howto-HuggingFaces-Token.png)
+
+**You also need to accept the licence of StableDiffusion here :  
+https://huggingface.co/CompVis/stable-diffusion-v1-4 **
+
+### Discord Bots, how do they work ?
+
+A bot is just a headless Discord client operating with a special "Bot"
+account, who needs a TOKEN to login to Discord, instead of a login/password.
+
+So, the `DISCORD_TOKEN` is used by the Bot to actually login to Discord.
+
+You can run a bot, along with your usual account, on the same machine, and the
+bot was actually only tested in that kind of environment.
+
+#### Creating a bot and bot account
 
 * Go to the [Discord Developer portal](https://discord.com/developers/applications).
 * Create a "New application", by clicking the upper right button near your Profile icon.
-* Setup the name.
+* Setup the name then make sure you're currently editing your new application.
 * In Bot (Left panel), in "Build-A-Bot", click on "Add Bot" and Confirm.
 * On Oauth2 General (Left panel), select :
   * **AUTHORIZATION METHOD**  
@@ -149,22 +226,21 @@ in that kind of environment.
 >   Set the permissions again on both panels  
 >   Open the new URL in your browser and invite the Bot again on the same server.
 
-## Configuration
+##### Screenshots of the authorizations
 
-### Requirements
+###### Oauth2 General
 
-To configure the bot, create a .env file with at least the following variables :
+![Screenshot of authorizations checkboxes required in Oauth2 General](screenshots/Discord-App-Oauth2-General.png)
 
-```env
-DISCORD_TOKEN=YourDiscordBotToken
-HUGGINGFACES_TOKEN=YourHuggingFaceToken
-```
+###### Bot intentions
 
-You can also copy the commented `.env.sample` to `.env` and edit it.
+![Screenshot of the Bot setup](screenshots/Discord-Bot-Intentions.png)
 
-## How do I get the required informations ?
+###### Oauth2 URL Generator
 
-### Discord Bot Token
+![Screensoht of authorizations checkboxes required in Oauth2 URL Generator](screenshots/Discord-App-Oauth2-URL-Generator.png)
+
+#### Discord Bot Token
 
 If you don't know it, click on "Reset Token" in the "Bot" section of your
 application.
@@ -174,19 +250,7 @@ You can view your application settings on the [Discord Developer Portal](https:/
 
 Once generated, copy the token as `DISCORD_TOKEN` in the `.env` file.
 
-### Huggingface Token
-
-You need to be registered on HuggingFaces.
-
-Then go to "Access Token" from your User Profile and generate or copy your token
-in the `.env` file as `HUGGINGFACES_TOKEN`.
-
-![Get an Access Token](./screenshots/Howto-HuggingFaces-Token.png)
-
-Also, note that you also need to accept the licence of StableDiffusion here :  
-https://huggingface.co/CompVis/stable-diffusion-v1-4
-
-## Additional configuration
+# Additional configuration
 
 Here's the list of **optional** environment variables you
 can define to configure the bot.  
@@ -260,13 +324,13 @@ When not defined, their **Default** value will be used.
 * `COMPACT_RESPONSES`  
   When set to `True` or `true`, the job response will only include the pictures,
   without any further details (like the Seed, Actual Prompt.).  
-  **Default** : False  
+  **Default** : `false`  
   Example : `COMPACT_RESPONSES=True`  
   > You can still use "Check Degu PNG Metadata" when using compact responses.
 
 * `DEFAULT_IMAGES_PER_JOB`  
   The default **NUMBER OF IMAGES** used in `/degudiffusion` form.  
-  **Default** : 8  
+  **Default** : `8`  
   Example : `DEFAULT_IMAGES_PER_JOB=3`
 
 * `DEFAULT_PROMPT`  
@@ -283,12 +347,12 @@ When not defined, their **Default** value will be used.
 
 * `DEFAULT_INFERENCES_STEPS`  
   The default number of **INFERENCES** used in `/degudiffusion` form.  
-  **Default** : 60  
+  **Default** : `60`  
   Example : `DEFAULT_INFERENCES_STEPS=30`
 
 * `DEFAULT_GUIDANCE_SCALE`  
   The default **GUIDANCE SCALE** used in `/degudiffusion` form.  
-  **Default** : 7.5  
+  **Default** : `7.5`  
   Example : `DEFAULT_GUIDANCE_SCALE=15`
 
 * `SEED_MINUS_ONE_IS_RANDOM`  
@@ -303,7 +367,7 @@ When not defined, their **Default** value will be used.
 * `STABLEDIFFUSION_LOCAL_ONLY`  
   Force `StableDiffusionPipeline` to use predownloaded local files only, and avoid
   connecting to the internet.  
-  **Default** : False  
+  **Default** : `false`  
   Example : `STABLEDIFFUSION_LOCAL_ONLY=true`  
   > When set to true, `HUGGINGFACES_TOKEN` is not required anymore.
 
@@ -316,7 +380,7 @@ When not defined, their **Default** value will be used.
   Example : `STABLEDIFFUSION_CACHE_DIR=sd_cache`  
   > The directory will be created if it doesn't exist.
 
-* `STABLE_DIFFUSION_MODEL_NAME`  
+* `STABLEDIFFUSION_MODEL_NAME`  
   Determine the HuggingFaces model used by `StableDiffusionPipeline`.  
   **Default** : `CompVis/stable-diffusion-v1-4`
   > Do not change this unless you really know what you are doing.
@@ -327,7 +391,122 @@ When not defined, their **Default** value will be used.
   Any value other that `cuda` is untested.  
   Example : `TORCH_DEVICE=rocm`
 
-### Compact mode
+* `FORM_NUMBER_OF_IMAGES_INPUT_MAX`  
+  Maximum number of characters allowed for **NUMBER OF IMAGES** in
+  /degudiffusion form.  
+  **Default** : `4`  
+  Example : `FORM_NUMBER_OF_IMAGES_INPUT_MAX=3`
+
+* `FORM_PROMPT_INPUT_MAX`  
+  Maximum number of characters allowed for **PROMPT** in
+  /degudiffusion form.  
+  **Default** : `500`  
+  Example : `FORM_PROMPT_INPUT_MAX=100`  
+  > Note that with the default setup, StableDiffusion will
+  > parse up to 77 tokens and ignore the rest.  
+
+* `FORM_SEED_INPUT_MAX`  
+  Maximum number of characters allowed for **SEED** in
+  /degudiffusion form.  
+  **Default** : `38`  
+  Example : `FORM_SEED_INPUT_MAX=200`
+
+* `FORM_INFERENCES_INPUT_MAX`
+  Maximum number of characters allowed for **INFERENCES** in
+  /degudiffusion form.  
+  **Default** : `3`  
+  Example : `FORM_INFERENCES_INPUT_MAX=2`
+
+* `FORM_GUIDANCE_SCALE_INPUT_MAX`  
+  Maximum number of characters allowed for GUIDANCE SCALE in
+  /degudiffusion form.  
+  **Default** : `6`  
+  Example : `FORM_GUIDANCE_SCALE_INPUT_MAX=3`  
+  > Be careful, conversion from float to string adds at least one decimal.  
+  This conversion might lead to errors when using the `DEFAULT_GUIDANCE_SCALE`,
+  while preparing the form.  
+  For example, if `DEFAULT_GUIDANCE_SCALE=7` then the displayed value
+  will be `7.0`, and will take 3 characters.  
+  If `FORM_GUIDANCE_SCALE_INPUT_MAX` is set to `2` characters, the form
+  will become unuseable.  
+  
+## Special tags
+
+* `{random_artists}`  
+Adds 1 to 5 random artists names
+* `{random_tags}`  
+Adds 0 to 4 random tags
+* `{lyuma_cheatcodes}`  
+Try it !
+
+You can add more by editing [replacers.json](replacers.json)
+
+## Denying prompts
+
+If the file **config/denied_expressions.txt** exists, each line of these files
+is interpreted as a Regular Expression.  
+When a user request an image generation, if the prompt matches any of these
+regular expressions, the generation request is denied.
+
+This file is **optional** and is not created by default.
+
+There are various online tools to build Regular Expressions, like, for example,
+https://regex101.com/ .
+
+### Examples
+
+In the following examples, "denied" means that the generation request
+will be denied, if the mentionned word is present in the prompt.
+
+### Example 1
+
+Using the following **config/denied_expressions.txt**
+
+```
+Table
+```
+
+If the prompt contains the characters "table", the generation request
+will be denied.
+
+Meaning that the prompt :
+
+* "Hamsters playing roulette around a **tABlE**" will be denied.  
+* "Horses in their S**table**s" will be denied.
+
+![Demonstration of the first example](screenshots/DeniedExpressions_Ex1.png)
+
+### Example 2
+
+Using the following **config/denied_expressions.txt**
+
+```
+\bTable
+Sofa\b
+chair
+```
+
+Prompt will be denied if any of thees conditions is true :
+* The prompt contains any word starting with "table"
+* The prompt contains any word ending with "sofa"
+* The prompt contains the characters "chair"
+
+Meaning that the promt :
+* "A pic-nic **table**" will be denied.
+* "People playing **Table**top RPG" will be denied.
+* "An Unstable portal" will be accepted.
+* "A photo of a bed-**sofa**" will be denied.
+* "A world Sofar" will be accepted.
+* "Reunion of Arm**chair** general" will be denied.
+
+![Demonstration of the second example](screenshots/DeniedExpressions_Ex2.png)
+
+### Technical notes
+
+The regular expressions are compiled with the `re` Python
+standard library, using only one flag : `re.IGNORECASE`.
+
+## Compact mode
 
 Here are two screenshots with :
 
