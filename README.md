@@ -35,28 +35,32 @@
 
 # About
 
-This is the code of the first version of my Discord bot named "DeguDiffusion",
-a self-hosted Discord bot providing AI Image Generation to Discord users, using a local installation of StableDiffusion.  
+This is the code of the first version of my Discord bot software named "DeguDiffusion",
+that allows you to run your own self-hosted AI images generation Discord bot
+using a local StableDiffusion installation.
 
-This is only the core of the application. The creation of the Bot Account and the
-Discord application is left to you.  
+The software is available under MIT license.
+
+The concept behind it is simple :
+
+* You create a bot account, and add its token to the `.env` file as `DISCORD_TOKEN`.
+* The software will use the bot account to connect to Discord and register image
+  generation commands (`/degudiffusion` notably) on the servers it has been invited
+  to.
+* Users on the servers use these commands to send image generation requests to your server.
+* Your server generate the images, using a local installation of
+  [HuggingFaces StableDiffusion](https://huggingface.co/CompVis/stable-diffusion-v1-4),
+  and send back the result through Discord.
 
 ![Main view](./screenshots/GenerateForm-Result.png)
 
-The software is meant to run on a machine equipped with an NVIDIA GPU.
+The software is meant to run on a machine equipped with an NVIDIA GPU.  
+This has not been tested at all with AMD or Intel GPU.
 
-Once configured properly, the software will connect to Discord using the Bot
-account credentials provided, and start accepting generation requests from
-users on the servers the bot has been invited to.  
-Then the bot will use a local installation of StableDiffusion to generate the
-image according to the requests, and send them back on the same channel, using
-a pregenerated thread when deemed appropriate (when requesting more than 2 images
-by default).
-
-The bot has a Job Queue system, allowing you to queue generations
+A Job Queue system is provided, allowing you to queue generations
 requests and treat them once previous ones finished.
 
-Each batch generates a specific thread, unless its size is lower than
+Each request job generates a specific thread, unless its size is lower than
 a certain amount, in which cases messages are sent directly on the same channel.
 
 ![Messages sent directly](./screenshots/GenerateForm-Result-Direct.png)
