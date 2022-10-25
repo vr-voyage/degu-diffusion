@@ -242,18 +242,19 @@ in the `.env` file after `HUGGINGFACES_TOKEN=` (No need to add quotes).
 
 ![Get an Access Token](./screenshots/Howto-HuggingFaces-Token.png)
 
-**You also need to accept the licence of StableDiffusion here :  
-https://huggingface.co/CompVis/stable-diffusion-v1-4 **
+> By default, you also need to accept the licence of
+> [CompVis/stable-diffusion-v1-4](https://huggingface.co/CompVis/stable-diffusion-v1-4)
 
 ### Discord Bots, how do they work ?
 
-A bot is just a headless Discord client operating with a special "Bot"
-account, who needs a TOKEN to login to Discord, instead of a login/password.
+A bot is just a special Discord account, who needs a TOKEN to login to Discord,
+instead of a login/password.
 
-So, the `DISCORD_TOKEN` is used by the Bot to actually login to Discord.
+So, the `DISCORD_TOKEN` is used by this software to actually login to Discord
+as the Bot.
 
-You can run a bot, along with your usual account, on the same machine, and the
-bot was actually only tested in that kind of environment.
+> You can run a bot while being also being connected to Discord with another account,
+> on the same machine, and the bot was actually only tested in that kind of environment.
 
 #### Creating a bot and bot account
 
