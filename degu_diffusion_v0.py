@@ -325,7 +325,6 @@ async def repeat_diffusion(interaction: discord.Interaction, message: discord.Me
     }
     for required_field in required_fields:
         if not ("\n" + required_field) in message.content:
-            print("\n\n%s is MISSING\n\n" % (required_field))
             await interaction.response.send_message("Some fields appear missing, so I guess this script isn't updated", ephemeral = True)
             return
 
