@@ -109,12 +109,6 @@ class MyClient(discord.Client):
                 kwargs["ephemeral"] = ephemeral
             asyncio.ensure_future(response.send(**kwargs))
 
-    async def on_member_join(self, member:discord.Member):
-        guild = member.guild
-        if guild.system_channel is not None:
-            to_send = f'Welcome {guild.name} ! You can start using '
-            await guild.system_channel.send(to_send)
-
 # Remember, you're limited to 5 fields in a Discord form
 # Well, Discord.py will yell at you if you go over 5 fields.
 class Generate(discord.ui.Modal, title='Generate'):
