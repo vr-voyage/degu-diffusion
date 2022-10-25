@@ -1,3 +1,42 @@
+- [Quick installation](#quick-installation)
+- [Provided commands](#provided-commands)
+  - [DeguDiffusion](#degudiffusion)
+  - [Repeat Diffusion](#repeat-diffusion)
+  - [Check Degu PNG Metadata](#check-degu-png-metadata)
+- [Using the bot software](#using-the-bot-software)
+  - [Requirements](#requirements)
+  - [First configuration](#first-configuration)
+  - [Running](#running)
+    - [On Windows](#on-windows)
+    - [On Linux](#on-linux)
+    - [Through Docker-compose](#through-docker-compose)
+    - [On other platforms](#on-other-platforms)
+      - [Install the dependencies](#install-the-dependencies)
+      - [Run the bot](#run-the-bot)
+  - [Testing StableDiffusion alone](#testing-stablediffusion-alone)
+  - [How do I get the required informations ?](#how-do-i-get-the-required-informations-)
+    - [Huggingface Token](#huggingface-token)
+    - [Discord Bots, how do they work ?](#discord-bots-how-do-they-work-)
+      - [Creating a bot and bot account](#creating-a-bot-and-bot-account)
+        - [Screenshots of the authorizations](#screenshots-of-the-authorizations)
+          - [Oauth2 General](#oauth2-general)
+          - [Bot intentions](#bot-intentions)
+          - [Oauth2 URL Generator](#oauth2-url-generator)
+      - [Discord Bot Token](#discord-bot-token)
+- [Additional configuration](#additional-configuration)
+  - [Lower VRAM usage](#lower-vram-usage)
+  - [Using Waifu Diffusion instead](#using-waifu-diffusion-instead)
+  - [Environment variables list](#environment-variables-list)
+  - [Special tags](#special-tags)
+  - [Denying prompts](#denying-prompts)
+    - [Examples](#examples)
+    - [Example 1](#example-1)
+    - [Example 2](#example-2)
+    - [Technical notes](#technical-notes)
+  - [Compact mode](#compact-mode)
+- [Special notes](#special-notes)
+- [Known bugs](#known-bugs)
+
 # About <!-- omit in toc -->
 
 This is the code of the first version of my Discord bot software named "DeguDiffusion",
@@ -36,40 +75,22 @@ and remake a more versatile one.
 
 ![Running bot](./screenshots/RunningBot.png)
 
-# Table of Contents <!-- omit in toc -->
+# Quick installation
 
-- [Provided commands](#provided-commands)
-  - [DeguDiffusion](#degudiffusion)
-  - [Repeat Diffusion](#repeat-diffusion)
-  - [Check Degu PNG Metadata](#check-degu-png-metadata)
-- [Using the bot software](#using-the-bot-software)
-  - [Requirements](#requirements)
-  - [First configuration](#first-configuration)
-  - [Running](#running)
-    - [On Windows](#on-windows)
-    - [On other platforms](#on-other-platforms)
-      - [Install the dependencies](#install-the-dependencies)
-      - [Run the bot](#run-the-bot)
-  - [Testing StableDiffusion alone](#testing-stablediffusion-alone)
-  - [How do I get the required informations ?](#how-do-i-get-the-required-informations-)
-    - [Huggingface Token](#huggingface-token)
-    - [Discord Bots, how do they work ?](#discord-bots-how-do-they-work-)
-      - [Creating a bot and bot account](#creating-a-bot-and-bot-account)
-        - [Screenshots of the authorizations](#screenshots-of-the-authorizations)
-          - [Oauth2 General](#oauth2-general)
-          - [Bot intentions](#bot-intentions)
-          - [Oauth2 URL Generator](#oauth2-url-generator)
-      - [Discord Bot Token](#discord-bot-token)
-- [Additional configuration](#additional-configuration)
-  - [Special tags](#special-tags)
-  - [Denying prompts](#denying-prompts)
-    - [Examples](#examples)
-    - [Example 1](#example-1)
-    - [Example 2](#example-2)
-    - [Technical notes](#technical-notes)
-  - [Compact mode](#compact-mode)
-- [Special notes](#special-notes)
-- [Known bugs](#known-bugs)
+Setup a `.env` file with at least two entries :
+
+```env
+# Make sure your bot has sufficient rights and privileges.
+# Write your Discord bot token after the '='. No quotes needed.
+DISCORD_TOKEN=
+
+# Make sure you accepted the license on
+# https://huggingface.co/CompVis/stable-diffusion-v1-4
+# Write your Huggingfaces token after the '='. No quotes needed.
+HUGGINGFACES_TOKEN=
+```
+
+Then run `STARTBOT.bat` (or `STARTBOT.sh` on Linux).
 
 # Provided commands
 
@@ -109,8 +130,8 @@ Sends back the metadata of a generated PNG, if it still exist on the server.
 
 # Using the bot software
 
-This is mainly designed to run on a simple Windows PC.  
-I haven't tested it on Linux yet.
+This is mainly designed to run on a simple Windows PC,
+but it also been tested on Linux.
 
 ## Requirements
 
@@ -144,6 +165,47 @@ HUGGINGFACES_TOKEN=
 
 Double-click on **STARTBOT.bat** and wait for "StableDiffusion ready to go".
 
+### On Linux
+
+Run **STARTBOT.sh** (`./STARTBOT.sh`) and wait for "StableDiffusion ready to go"
+
+### Through Docker-compose
+
+Use the following setup :
+
+```yaml
+version: "3.9"
+services:
+  degu:
+    image: vrvoyage/degudiffusion:1.1
+    build: .
+    env_file: .env
+    environment:
+      - STABLEDIFFUSION_CACHE_DIR=stablediffusion_cache
+      - IMAGES_OUTPUT_DIRECTORY=generated # Can be commented if SAVE_IMAGES_TO_DISK is set to false
+      # - SAVE_IMAGES_TO_DISK=false # If you uncomment this, you can comment the first volume
+    volumes:
+      - ./generated:/app/generated # Only required if SAVE_IMAGES_TO_DISK=false isn't set
+      - ./cache:/app/stablediffusion_cache # Related to STABLEDIFFUSION_CACHE_DIR
+      - ./config:/app/config # Can be mounted in Read-Only if a 'replacers.json' file is already present
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+The Docker-image is available here :  https://hub.docker.com/r/vrvoyage/degudiffusion
+
+The build image is available here : https://github.com/vr-voyage/degu-diffusion-docker
+
+> On Windows, make sure your docker installation supports CUDA.
+
+> On Linux, make sure you have [`nvidia-container-runtime`](https://github.com/NVIDIA/nvidia-container-runtime) installed
+> and setup in your `docker/daemon.json` configuration file (Generally in `/etc`).
+
 ### On other platforms
 #### Install the dependencies
 
@@ -154,24 +216,20 @@ pip install -r requirements.txt
 #### Run the bot
 
 ```bash
-./STARTBOT.sh # or python3 degu_diffusion_v0.py
+python degu_diffusion_v0.py
 ```
 
 ## Testing StableDiffusion alone
 
 If you want to test StableDiffusion itself alone,
-run `test_stablediffusion_alone.bat` or `test_stablediffusion_alone.sh`.
+run `TEST_STABLEDIFFUSION.bat` or `TEST_STABLEDIFFUSION.sh`.
 
 Using default settings, this should output 8 images in the output
 folder (`generated/` by default).  
-The prompt used during the tests is :  
-**Degu enjoys its morning coffee by {random_artists}, {random_tags}**
 
 If the test fails, check the `HUGGINGFACES_TOKEN` you put in the `.env` file.  
 Also pay attention to every line output on the terminal, some of them might
 provide clear explanations about what's going on.
-
-See **Configuration** below for how to setup the `.env` file.
 
 ## How do I get the required informations ?
 
@@ -180,7 +238,7 @@ See **Configuration** below for how to setup the `.env` file.
 You need to be registered on HuggingFaces.
 
 Then go to "Access Token" from your User Profile and generate or copy your token
-in the `.env` file as `HUGGINGFACES_TOKEN`.
+in the `.env` file after `HUGGINGFACES_TOKEN=` (No need to add quotes).
 
 ![Get an Access Token](./screenshots/Howto-HuggingFaces-Token.png)
 
@@ -220,7 +278,8 @@ bot was actually only tested in that kind of environment.
    * Copy the generated URL at the bottom.
 * Enter this URL in your browser to add the generated bot to one of your server.  
 > You can also send this link to people who'd like to invite the bot to their server.
-* In Bot, again, click on 'Reset Token' and save it as `DISCORD_TOKEN` in the `.env` file.
+* In Bot, again, click on 'Reset Token' and copy it after `DISCORD_TOKEN=` in the `.env` file
+  (No need to use quotes).
 
 > If the permissions were wrong :  
 >   Set the permissions again on both panels  
@@ -252,6 +311,26 @@ Once generated, copy the token as `DISCORD_TOKEN` in the `.env` file.
 
 # Additional configuration
 
+## Lower VRAM usage
+
+Add the following line to your `.env` file to switch to Float16 mode
+and reduce the VRAM usage by half (roughly) :
+
+```
+STABLEDIFFUSION_MODE=fp16
+```
+
+## Using Waifu Diffusion instead
+
+Add the following lines to your `.env` file, to use the
+[Waifu Diffusion model](https://huggingface.co/hakurei/waifu-diffusion) instead :
+
+```
+STABLEDIFFUSION_MODEL_NAME=hakurei/waifu-diffusion
+```
+
+## Environment variables list
+
 Here's the list of **optional** environment variables you
 can define to configure the bot.  
 When not defined, their **Default** value will be used.
@@ -270,6 +349,11 @@ When not defined, their **Default** value will be used.
   **Default** : `true`  
   Example : `SAVE_IMAGES_TO_DISK=false`  
   > This setting is ignored when testing Stable Diffusion alone.
+
+* `STABLEDIFFUSION_MODEL_NAME`  
+  Determine the HuggingFaces model used by `StableDiffusionPipeline`.  
+  **Default** : `CompVis/stable-diffusion-v1-4`  
+  Example : `STABLEDIFFUSION_MODEL_NAME=hakurei/waifu-diffusion`
 
 * `STABLEDIFFUSION_MODE`  
   Allows you to select between different StableDiffusion modes.  
@@ -379,11 +463,6 @@ When not defined, their **Default** value will be used.
   determine where to download its files.  
   Example : `STABLEDIFFUSION_CACHE_DIR=sd_cache`  
   > The directory will be created if it doesn't exist.
-
-* `STABLEDIFFUSION_MODEL_NAME`  
-  Determine the HuggingFaces model used by `StableDiffusionPipeline`.  
-  **Default** : `CompVis/stable-diffusion-v1-4`
-  > Do not change this unless you really know what you are doing.
 
 * `TORCH_DEVICE`  
   Determine the PyTorch device used. Default to "cuda".  
