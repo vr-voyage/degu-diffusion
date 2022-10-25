@@ -68,7 +68,6 @@ class DeguDiffusionWorker():
         pipe = pipe.to(self.torch_device)
         pipe.enable_attention_slicing()
         logger.debug(str(pipe))
-        logger.info("StableDiffusion ready to go")
 
         # Worker specific values
         self.output_folder:pathlib.Path = pathlib.Path(output_folder) if output_folder else None
@@ -78,6 +77,9 @@ class DeguDiffusionWorker():
             replacers_filepath     = REPLACERS_FILEPATH,
             sample_filepath        = REPLACER_SAMPLE_FILEPATH,
             old_replacers_filepath = OLD_REPLACER_FILEPATH)
+                    
+        logger.info(f"Using model {model_name}")
+        logger.info("StableDiffusion ready to go")
 
     def generate_image(
         self,
