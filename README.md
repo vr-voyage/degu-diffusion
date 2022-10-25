@@ -100,11 +100,11 @@ Sends back the metadata of a generated PNG, if it still exist on the server.
 ![PNG Metadata](./screenshots/Apps-CheckPNG-Result.png)
 
 > Note : This doesn't try to download the PNG !  
-> This ony read it if the server already has it.
+> This only reads it from the server harddrive, if it's still present.
 >
-> Also, this generates ephemeral messages ("Only you can see this message" messages).  
+> Also, this uses ephemeral messages ("Only you can see this message" messages).  
 > Sometimes these messages cannot be seen by the client, when sent inside
-> threads.  
+> threads, due to some obscure Discord client bug.  
 > In this case, just try again.
 
 # Using the bot software
@@ -527,3 +527,6 @@ remember that it's still GPU intensive and VRAM heavy.
 
 * The 'Job done' message is sent just before the last result, due to
 timing issues.
+* Invoking `/degudiffusion` from a Discord thread by cause errors,
+since the software will try to create a thread inside a thread, which
+is not supported by Discord.
