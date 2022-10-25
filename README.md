@@ -1,39 +1,4 @@
-# TOC <!-- omit in toc -->
-
-- [About](#about)
-- [Provided commands](#provided-commands)
-  - [DeguDiffusion](#degudiffusion)
-  - [Repeat Diffusion](#repeat-diffusion)
-  - [Check Degu PNG Metadata](#check-degu-png-metadata)
-- [Running the bot](#running-the-bot)
-  - [Requirements](#requirements)
-  - [Running](#running)
-    - [On Windows](#on-windows)
-    - [On other platforms](#on-other-platforms)
-      - [Install the dependencies](#install-the-dependencies)
-      - [Run the bot](#run-the-bot)
-  - [Testing SD alone](#testing-sd-alone)
-  - [How do I get the required informations ?](#how-do-i-get-the-required-informations-)
-    - [Huggingface Token](#huggingface-token)
-    - [Discord Bots, how do they work ?](#discord-bots-how-do-they-work-)
-      - [Creating a bot and bot account](#creating-a-bot-and-bot-account)
-        - [Screenshots of the authorizations](#screenshots-of-the-authorizations)
-          - [Oauth2 General](#oauth2-general)
-          - [Bot intentions](#bot-intentions)
-          - [Oauth2 URL Generator](#oauth2-url-generator)
-      - [Discord Bot Token](#discord-bot-token)
-- [Additional configuration](#additional-configuration)
-  - [Special tags](#special-tags)
-  - [Denying prompts](#denying-prompts)
-    - [Examples](#examples)
-    - [Example 1](#example-1)
-    - [Example 2](#example-2)
-    - [Technical notes](#technical-notes)
-  - [Compact mode](#compact-mode)
-- [Special notes](#special-notes)
-- [Known bugs](#known-bugs)
-
-# About
+# About <!-- omit in toc -->
 
 This is the code of the first version of my Discord bot software named "DeguDiffusion",
 that allows you to run your own self-hosted AI images generation Discord bot
@@ -65,11 +30,46 @@ a certain amount, in which cases messages are sent directly on the same channel.
 
 ![Messages sent directly](./screenshots/GenerateForm-Result-Direct.png)
 
-This bot won't receive major updates, I'm just uploading this version since it's
+This software won't receive major updates, I'm just uploading this version since it's
 working, and want to keep the working version somewhere before I break it
 and remake a more versatile one.
 
 ![Running bot](./screenshots/RunningBot.png)
+
+# Table of Contents <!-- omit in toc -->
+
+- [Provided commands](#provided-commands)
+  - [DeguDiffusion](#degudiffusion)
+  - [Repeat Diffusion](#repeat-diffusion)
+  - [Check Degu PNG Metadata](#check-degu-png-metadata)
+- [Using the bot software](#using-the-bot-software)
+  - [Requirements](#requirements)
+  - [First configuration](#first-configuration)
+  - [Running](#running)
+    - [On Windows](#on-windows)
+    - [On other platforms](#on-other-platforms)
+      - [Install the dependencies](#install-the-dependencies)
+      - [Run the bot](#run-the-bot)
+  - [Testing StableDiffusion alone](#testing-stablediffusion-alone)
+  - [How do I get the required informations ?](#how-do-i-get-the-required-informations-)
+    - [Huggingface Token](#huggingface-token)
+    - [Discord Bots, how do they work ?](#discord-bots-how-do-they-work-)
+      - [Creating a bot and bot account](#creating-a-bot-and-bot-account)
+        - [Screenshots of the authorizations](#screenshots-of-the-authorizations)
+          - [Oauth2 General](#oauth2-general)
+          - [Bot intentions](#bot-intentions)
+          - [Oauth2 URL Generator](#oauth2-url-generator)
+      - [Discord Bot Token](#discord-bot-token)
+- [Additional configuration](#additional-configuration)
+  - [Special tags](#special-tags)
+  - [Denying prompts](#denying-prompts)
+    - [Examples](#examples)
+    - [Example 1](#example-1)
+    - [Example 2](#example-2)
+    - [Technical notes](#technical-notes)
+  - [Compact mode](#compact-mode)
+- [Special notes](#special-notes)
+- [Known bugs](#known-bugs)
 
 # Provided commands
 
@@ -107,12 +107,10 @@ Sends back the metadata of a generated PNG, if it still exist on the server.
 > threads.  
 > In this case, just try again.
 
-# Running the bot
+# Using the bot software
 
 This is mainly designed to run on a simple Windows PC.  
 I haven't tested it on Linux yet.
-
-Execute `STARTBOT.bat` or `STARTBOT.sh`.
 
 ## Requirements
 
@@ -121,7 +119,7 @@ Execute `STARTBOT.bat` or `STARTBOT.sh`.
 * A [Discord bot account](https://discord.com/developers/applications) for a `DISCORD_TOKEN`
 * A [HuggingFaces account](https://huggingface.co/) for a `HUGGINGFACES_TOKEN`
 
-## Running
+## First configuration
 
 > If you're using Docker, check https://hub.docker.com/r/vrvoyage/degudiffusion
 
@@ -141,14 +139,12 @@ HUGGINGFACES_TOKEN=
 > Check `.env.sample` for more configuration directives.  
 > Read below if you want to know how to get these tokens.
 
-Then
-
+## Running
 ### On Windows
 
 Double-click on **STARTBOT.bat** and wait for "StableDiffusion ready to go".
 
 ### On other platforms
-
 #### Install the dependencies
 
 ```bash
@@ -161,10 +157,10 @@ pip install -r requirements.txt
 ./STARTBOT.sh # or python3 degu_diffusion_v0.py
 ```
 
-## Testing SD alone
+## Testing StableDiffusion alone
 
-If you want to test SD itself alone, run `test_stablediffusion_alone.bat` or
-`test_stablediffusion_alone.sh`.
+If you want to test StableDiffusion itself alone,
+run `test_stablediffusion_alone.bat` or `test_stablediffusion_alone.sh`.
 
 Using default settings, this should output 8 images in the output
 folder (`generated/` by default).  
@@ -458,9 +454,6 @@ There are various online tools to build Regular Expressions, like, for example,
 https://regex101.com/ .
 
 ### Examples
-
-In the following examples, "denied" means that the generation request
-will be denied, if the mentionned word is present in the prompt.
 
 ### Example 1
 
