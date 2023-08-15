@@ -40,8 +40,8 @@
 # About <!-- omit in toc -->
 
 This is the code of the first version of my Discord bot software named "DeguDiffusion",
-that allows you to run your own self-hosted AI images generation Discord bot
-using a local StableDiffusion installation.
+that allows you to run your own AI-powered images generation bot on Discord
+using a local installation of StableDiffusion.
 
 The software is available under MIT license.
 

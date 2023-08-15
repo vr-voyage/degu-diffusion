@@ -12,10 +12,13 @@ from typing import NamedTuple
 import time
 import traceback
 
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline, DiffusionPipeline, EulerAncestralDiscreteScheduler
 from PIL.Image import Image
 from PIL.PngImagePlugin import PngInfo
 import torch
+from safetensors.torch import load_file
+
+
 
 REPLACERS_FILEPATH="config/replacers.json"
 OLD_REPLACER_FILEPATH="replacers.json"
@@ -27,7 +30,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class DeguDiffusionWorker():
 
-    def __init__(self, sd_token:str, output_folder:str="", save_to_disk:bool=True, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda"):
+    def __init__(self, sd_token:str, output_folder:str="", save_to_disk:bool=True, model_name:str="CompVis/stable-diffusion-v1-4", mode:str="fp32", local_only:bool=False, sd_cache_dir:str="", torch_device="cuda", additional_model=""):
 
         # Test
         logger = logging.getLogger('DeguDiffusionWorker')
@@ -45,6 +48,8 @@ class DeguDiffusionWorker():
                 raise ValueError(f"The provided images output path doesn't point to a directory :\n{output_folder}")
 
         pipeline_kwargs = dict()
+        pipeline_kwargs["use_safetensors"] = True
+        pipeline_kwargs["add_watermarker"] = False
 
         if sd_token:
             pipeline_kwargs["use_auth_token"] = sd_token
@@ -58,15 +63,24 @@ class DeguDiffusionWorker():
             pipeline_kwargs["local_files_only"] = True
 
         if mode == "fp16":
-            pipeline_kwargs["revision"] = "fp16"
+            pipeline_kwargs["variant"] = "fp16"
             pipeline_kwargs["torch_dtype"] = torch.float16
+        pipeline_kwargs["torch_dtype"] = torch.float16
 
-        pipe = StableDiffusionPipeline.from_pretrained(
-            self.model_name,
-            **pipeline_kwargs)
+        #scheduler = DDIMScheduler.from_pretrained(self.model_name, subfolder="scheduler", **pipeline_kwargs)
+        #scheduler = DPMSolverMultistepScheduler.from_pretrained(self.model_name, subfolder="scheduler")
+        #pipeline_kwargs["scheduler"] = scheduler
+        if not self.model_name.startswith("./"):
+            pipe = DiffusionPipeline.from_pretrained(self.model_name, **pipeline_kwargs)
+        else:
+            pipe = StableDiffusionPipeline.from_single_file(self.model_name, **pipeline_kwargs)
+        pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+        #pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
 
-        pipe = pipe.to(self.torch_device)
-        pipe.enable_attention_slicing()
+        #pipe = StableDiffusionPipeline.from_pretrained(pathlib.Path("./stablediffusion_cache/nai"), **pipeline_kwargs)
+
+        pipe.to(self.torch_device)
+        #pipe.enable_attention_slicing()
         logger.debug(str(pipe))
 
         # Worker specific values
@@ -105,31 +119,34 @@ class DeguDiffusionWorker():
 
         report["actual_prompt"] = prompt if original_prompt != prompt else ""
 
+        negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name"
+
         metadata = PngInfo()
         metadata.add_itxt("AI_Prompt", str(prompt), lang="utf8", tkey="AI_Prompt")
         metadata.add_text("AI_Torch_Seed", str(seed))
         metadata.add_text("AI_StableDiffusion_Guidance_Scale", str(guidance_scale))
         metadata.add_text("AI_StableDiffusion_Inferences", str(n_inferences))
         metadata.add_text("AI_StableDiffusion_Model_Name", str(self.model_name))
-        metadata.add_text("AI_Diffusers_Version", str(self.pipe._diffusers_version))
+        #metadata.add_text("AI_Diffusers_Version", str(self.pipe._diffusers_version))
         metadata.add_text("AI_Metadata_Type", "Voyage")
         metadata.add_text("AI_Metadata_Voyage_Version", "0")
         metadata.add_text("AI_Generator", str(self.model_name))
         metadata.add_text("AI_Torch_Generator", str(self.torch_device))
         metadata.add_text("AI_Custom_Deterministic", str(deterministic))
-        
+        metadata.add_itxt("AI_Prompt_Negative", str(negative_prompt), lang="utf8", tkey="AI_Prompt_Negative")
         metadata.add_text("AI_StableDiffusion_Pipe", str(self.pipe))
 
-        with torch.autocast(self.torch_device):
-            result = self.pipe(
-                prompt,
-                width=width,
-                height=height,
-                guidance_scale=guidance_scale,
-                generator=generator,
-                num_inference_steps=n_inferences)
+        #with torch.autocast(self.torch_device):
+        result = self.pipe(
+            prompt,
+            negative_prompt = negative_prompt,
+            width=width,
+            height=height,
+            guidance_scale=guidance_scale,
+            generator=generator,
+            num_inference_steps=n_inferences)
 
-        nsfw_flag = result["nsfw_content_detected"][0]
+        nsfw_flag = False # result["nsfw_content_detected"][0]
         report["seed"] = seed
         report["nsfw"] = nsfw_flag
         report["filepath"] = ""
@@ -284,14 +301,15 @@ if __name__ == "__main__":
     logger = logging.getLogger('StableDiffusion standalone test')
     # FIXME Factorize this with degu_diffusion into a specific python file.
     # Basically, make a configuration object...
-    IMAGES_OUTPUT_DIRECTORY     = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
-    IMAGES_WIDTH                = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
-    IMAGES_HEIGHT               = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
-    STABLEDIFFUSION_LOCAL_ONLY  = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
-    HUGGINGFACES_TOKEN          = os.environ.get('HUGGINGFACES_TOKEN', '')
-    STABLEDIFFUSION_MODEL_NAME  = os.environ.get('STABLEDIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
-    TORCH_DEVICE                = os.environ.get('TORCH_DEVICE', 'cuda')
-    STABLEDIFFUSION_CACHE_DIR   = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
+    IMAGES_OUTPUT_DIRECTORY      = os.environ.get('IMAGES_OUTPUT_DIRECTORY', 'generated')
+    IMAGES_WIDTH                 = Helpers.env_var_to_int('IMAGES_WIDTH', 512)
+    IMAGES_HEIGHT                = Helpers.env_var_to_int('IMAGES_HEIGHT', 512)
+    STABLEDIFFUSION_LOCAL_ONLY   = False if os.environ.get('STABLEDIFFUSION_LOCAL_ONLY', 'False').lower() != 'true' else True
+    HUGGINGFACES_TOKEN           = os.environ.get('HUGGINGFACES_TOKEN', '')
+    STABLEDIFFUSION_MODEL_NAME   = os.environ.get('STABLEDIFFUSION_MODEL_NAME', 'CompVis/stable-diffusion-v1-4')
+    TORCH_DEVICE                 = os.environ.get('TORCH_DEVICE', 'cuda')
+    STABLEDIFFUSION_CACHE_DIR    = os.environ.get('STABLEDIFFUSION_CACHE_DIR', '')
+    SAFETENSORS_ADDITIONAL_MODEL = os.environ.get('SAFETENSORS_ADDITIONAL_MODEL', '')
 
     if STABLEDIFFUSION_CACHE_DIR and (not os.path.exists(STABLEDIFFUSION_CACHE_DIR)):
         pathlib.Path(STABLEDIFFUSION_CACHE_DIR).mkdir(parents = True)
@@ -314,7 +332,8 @@ if __name__ == "__main__":
         mode          = os.environ.get('STABLEDIFFUSION_MODE', 'fp32'),
         sd_cache_dir  = os.environ.get('STABLEDIFFUSION_CACHE_DIR', ''),
         local_only    = STABLEDIFFUSION_LOCAL_ONLY,
-        torch_device  = TORCH_DEVICE)
+        torch_device  = TORCH_DEVICE,
+        additional_model = SAFETENSORS_ADDITIONAL_MODEL)
     logger.info("Standalone Stable Diffusion test")
 
     DEFAULT_IMAGES_PER_JOB    = Helpers.env_var_to_int('DEFAULT_IMAGES_PER_JOB', 8)

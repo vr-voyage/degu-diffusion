@@ -1,13 +1,18 @@
 numpy>=1.23.2
---extra-index-url https://download.pytorch.org/whl/cu113
-torch>=1.12.0
+--extra-index-url https://download.pytorch.org/whl/cu117
+torch>=2.0.1
+accelerate
 torchvision
 torchaudio
-diffusers>=0.4.0
+diffusers
 transformers
 scipy
 ftfy
 python-dotenv
 background
 discord.py
-
+invisible_watermark
+transformers
+accelerate
+safetensors
+omegaconf

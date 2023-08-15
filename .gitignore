@@ -9,3 +9,5 @@ __pycache__
 config/
 venv/
 stablediffusion_cache/
+models
+
